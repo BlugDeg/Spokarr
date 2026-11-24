@@ -1,6 +1,6 @@
 // Audiobookshelf: sign-in, library status, scan, match and tags
 import { state } from './store.mjs';
-import { cached, cleanTitle, fetchJson, log, norm, trimUrl, uncache, UserError } from './util.mjs';
+import { cached, cleanTitle, fetchJson, firstAuthor, log, norm, trimUrl, uncache, UserError } from './util.mjs';
 
 const cfg = () => state.settings.abs;
 export const absEnabled = () => !!(cfg().url && cfg().apiKey);
@@ -72,6 +72,24 @@ async function libraryId() {
   return lib?.id || '';
 }
 
+/** Plausible person name – keeps library folders like "!! Sorted" or "01 Hörbücher" out. */
+const looksLikeName = (s) => /^\p{L}[\p{L}\p{N}.,'’&-]*(\s+[\p{L}\p{N}.,'’&-]+){0,4}$/u.test(s)
+  && String(s).trim().length >= 3;
+
+/**
+ * Author from the folder name when ABS has no metadata. Two layouts are in use:
+ * "Author - Series - Title" in one folder, and "Author/Title" (the layout Spokarr itself creates on
+ * import), where the last folder is the title and the author is its parent.
+ */
+export const authorFromPath = (p) => {
+  const segs = String(p || '').split('/').map((s) => s.trim()).filter(Boolean);
+  const last = segs[segs.length - 1] || '';
+  const [first] = last.split(' - ');
+  if (last.includes(' - ') && looksLikeName(first.trim())) return firstAuthor(first.trim());
+  const parent = segs[segs.length - 2] || '';
+  return looksLikeName(parent) ? firstAuthor(parent) : '';
+};
+
 export async function absItems() {
   if (!absEnabled()) return [];
   return cached('abs:items', 60e3, async () => {
@@ -81,6 +99,7 @@ export async function absItems() {
       id: i.id, path: i.path,
       asin: i.media?.metadata?.asin || '',
       key: norm(cleanTitle(i.media?.metadata?.title || '')),
+      author: norm(firstAuthor(i.media?.metadata?.authorName) || i.media?.metadata?.authors?.[0]?.name || authorFromPath(i.path)),
     }));
   }).catch((e) => { log('Audiobookshelf unreachable:', e.message); return []; });
 }

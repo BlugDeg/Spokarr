@@ -8,7 +8,7 @@ import { findReleases } from './indexers.mjs';
 import { CLIENT_NAMES, clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
 import { notify } from './notify.mjs';
 import { LIBRARY_DIR, save, state } from './store.mjs';
-import { cleanTitle, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
+import { cleanTitle, firstAuthor, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
 
 // States: pending → (approved) searching → downloading → processing → available
 //         declined | not_found | failed
@@ -32,11 +32,22 @@ export function publicRequest(r) {
 export async function statusResolver() {
   const items = await absItems();
   const byAsin = new Map(items.filter((i) => i.asin).map((i) => [i.asin, i]));
-  // Title fallback only for library items without ASIN – otherwise every edition of a title would count as owned
-  const byKey = new Map(items.filter((i) => i.key && !i.asin).map((i) => [i.key, i]));
+  // Title fallback only for library items without ASIN and only with a matching author - a title-only
+  // comparison matches every book with the same title. Items with an ASIN match by ASIN alone, so a
+  // different edition (other narrator, abridged) does not count as owned.
+  const byTitleAuthor = new Map(items
+    .filter((i) => i.key && i.author && !i.asin)
+    .map((i) => [`${i.key}|${i.author}`, i]));
   const reqByAsin = new Map(state.requests.map((r) => [r.asin, r]));
   return (book) => {
-    const abs = byAsin.get(book.asin) || byKey.get(norm(cleanTitle(book.title)));
+    let abs = byAsin.get(book.asin);
+    if (!abs) {
+      const key = norm(cleanTitle(book.title));
+      for (const name of book.authors || []) {
+        const author = norm(firstAuthor(name));
+        if (author && (abs = byTitleAuthor.get(`${key}|${author}`))) break;
+      }
+    }
     if (abs) return { state: 'available', absId: abs.id };
     const req = reqByAsin.get(book.asin);
     if (req && req.status !== 'declined') return { state: req.status, progress: req.progress || 0, requestId: req.id };
