@@ -3,6 +3,13 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] – 2026-11-24
+
+### Added
+- Better chapters for releases split into many files (e.g. one file per CD track): consecutive files
+  with the same title tag become one chapter. Without usable tags, Audible chapters are used – but only
+  if the runtime matches within 1 %, so chapter marks never drift.
+
 ## [0.4.0] – 2026-11-24
 
 ### Added
@@ -51,6 +58,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - First public version: Audible catalog, Newznab search with release scoring, SABnzbd, import into
   Audiobookshelf, English and German interface.
 
+[0.4.1]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.1
 [0.4.0]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.0
 [0.3.0]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.3.0
 [0.2.1]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.2.1

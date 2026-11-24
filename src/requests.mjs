@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
-import { absAddTags, absEnabled, absItems, absMatch, absScan } from './abs.mjs';
+import { absAddTags, absEnabled, absImproveChapters, absItems, absMatch, absScan } from './abs.mjs';
 import { getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
 import { clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
@@ -183,6 +183,8 @@ async function linkInAbs(req) {
     if (item) {
       req.absId = item.id;
       await absMatch(item.id, req.asin, region().abs).catch(() => false);
+      const chapters = await absImproveChapters(item.id, req.asin, state.settings.general.region).catch((e) => `error ${e.message}`);
+      if (chapters !== 'kept') log('Chapters', req.book.title, '→', chapters);
       const u = state.users.find((x) => x.id === req.requestedBy);
       if (u && state.settings.general.tagRequester) {
         await absAddTags(item.id, [`Requested by ${u.username}`]).catch((e) => log('Tagging failed:', e.message));

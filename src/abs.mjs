@@ -105,3 +105,59 @@ export async function absAddTags(itemId, tags) {
   });
   return r.ok;
 }
+
+// ---------- Chapters ----------
+const looksLikeFileName = (t) => /\.(mp3|m4a|m4b|flac|ogg|opus)$/i.test(t) || /^(cd|disc|track|part)?[\s_-]*\d+[\s_-]/i.test(t);
+
+/**
+ * Releases split into many files (one per CD track) give one chapter per file named like the file.
+ * Better chapters, in this order:
+ *  1. title tags of the files – consecutive files with the same title become one chapter
+ *  2. Audible chapters (via Audiobookshelf/Audnexus) – only if the runtime matches within 1 %,
+ *     otherwise the chapter marks would drift (other editions often have different pauses)
+ */
+export async function absImproveChapters(itemId, asin, region) {
+  const item = await fetchJson(`${cfg().url}/api/items/${itemId}?expanded=1`, { headers: headers() });
+  const files = [...(item.media?.audioFiles || [])].sort((a, b) => a.index - b.index);
+  const current = item.media?.chapters || [];
+  const duration = files.reduce((s, a) => s + (a.duration || 0), 0);
+  if (files.length < 2 || !duration) return 'kept';
+  const fileBased = current.length === files.length || current.every((c) => looksLikeFileName(c.title || ''));
+  if (current.length && !fileBased) return 'kept';
+
+  let chapters = null;
+  let source = '';
+  const titles = files.map((a) => (a.metaTags?.tagTitle || '').trim());
+  if (titles.every(Boolean)) {
+    const grouped = [];
+    let t = 0;
+    files.forEach((a, i) => {
+      if (!grouped.length || grouped.at(-1).title !== titles[i]) grouped.push({ id: grouped.length, start: t, end: t + a.duration, title: titles[i] });
+      else grouped.at(-1).end = t + a.duration;
+      t += a.duration;
+    });
+    // only useful if files really share titles and the titles are not just file names
+    if (grouped.length >= 2 && grouped.length < files.length && !grouped.every((g) => looksLikeFileName(g.title))) {
+      chapters = grouped;
+      source = 'tags';
+    }
+  }
+  if (!chapters && asin) {
+    const d = await fetchJson(`${cfg().url}/api/search/chapters?asin=${encodeURIComponent(asin)}&region=${encodeURIComponent(region)}`, { headers: headers() }).catch(() => null);
+    const audible = d?.chapters || [];
+    const runtime = (d?.runtimeLengthMs || 0) / 1000;
+    if (audible.length >= 2 && runtime && Math.abs(runtime - duration) / duration < 0.01) {
+      chapters = audible.map((c, i) => ({
+        id: i, title: c.title,
+        start: c.startOffsetMs / 1000,
+        end: i < audible.length - 1 ? audible[i + 1].startOffsetMs / 1000 : duration,
+      }));
+      source = 'audible';
+    }
+  }
+  if (!chapters) return 'kept';
+  const r = await fetch(`${cfg().url}/api/items/${itemId}/chapters`, {
+    method: 'POST', headers: headers(), body: JSON.stringify({ chapters }),
+  });
+  return r.ok ? `${source}:${chapters.length}` : 'failed';
+}
