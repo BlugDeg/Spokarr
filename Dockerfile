@@ -1,7 +1,8 @@
 FROM node:22-alpine
 LABEL org.opencontainers.image.title="Spokarr" \
       org.opencontainers.image.description="Request and download audiobooks for your Audiobookshelf library" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/BlugDeg/Spokarr"
 WORKDIR /app
 COPY package.json server.mjs ./
 COPY src ./src

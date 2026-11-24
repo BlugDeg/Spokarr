@@ -8,9 +8,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/BlugDeg/Spokarr/actions/workflows/docker.yml"><img alt="Docker image" src="https://github.com/BlugDeg/Spokarr/actions/workflows/docker.yml/badge.svg"></a>
+  <a href="https://github.com/BlugDeg/Spokarr/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/BlugDeg/Spokarr?color=8b5cf6"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6366f1">
   <img alt="Node.js 20+" src="https://img.shields.io/badge/node-%E2%89%A520-8b5cf6">
-  <img alt="Docker" src="https://img.shields.io/badge/docker-ready-6366f1">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-6366f1">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-8b5cf6">
   <img alt="Languages" src="https://img.shields.io/badge/UI-English%20%7C%20Deutsch-6366f1">
 </p>
@@ -93,13 +95,33 @@ set up for them.
 
 ## Installation
 
+### Docker
+
+Ready-made images for **amd64** (PC, NAS) and **arm64** (Raspberry Pi 4/5) are published to the GitHub
+Container Registry:
+
+| Tag | Meaning |
+|---|---|
+| `ghcr.io/blugdeg/spokarr:latest` | latest release |
+| `ghcr.io/blugdeg/spokarr:0.2` | latest 0.2.x release |
+| `ghcr.io/blugdeg/spokarr:edge` | current `main` branch |
+
+```bash
+docker run -d --name spokarr --restart unless-stopped \
+  -p 5057:5057 \
+  -v ./data:/data \
+  -v /path/to/media:/media \
+  -e LIBRARY_DIR=/media/audiobooks \
+  --user 1000:1000 \
+  ghcr.io/blugdeg/spokarr:latest
+```
+
 ### Docker Compose
 
 ```yaml
 services:
   spokarr:
-    image: spokarr:latest
-    build: https://github.com/BlugDeg/Spokarr.git
+    image: ghcr.io/blugdeg/spokarr:latest
     container_name: spokarr
     restart: unless-stopped
     ports:
@@ -113,8 +135,10 @@ services:
 ```
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
+
+**Updating:** `docker compose pull && docker compose up -d`. Your settings in `data/` are kept.
 
 ### Without Docker
 

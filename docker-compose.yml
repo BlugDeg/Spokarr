@@ -1,18 +1,16 @@
 # Example setup. Adjust the volume paths to your system.
 services:
   spokarr:
-    image: spokarr:latest
-    build: .
+    image: ghcr.io/blugdeg/spokarr:latest
     container_name: spokarr
     restart: unless-stopped
-    # env_file: .env   # optional, only used to pre-fill settings on the first start
     ports:
       - "5057:5057"
     volumes:
-      - ./data:/data
-      # The same disk SABnzbd downloads to, so imports are a fast move
+      - ./data:/data                 # settings, users, requests
+      # The disk SABnzbd downloads to – imports are a fast move on the same disk
       - /path/to/media:/media
+    environment:
+      LIBRARY_DIR: /media/audiobooks # where Spokarr puts finished audiobooks
     # Run as the user that owns your media files
     user: "1000:1000"
-    environment:
-      LIBRARY_DIR: /media/audiobooks
