@@ -135,6 +135,20 @@ async function linkOrCopy(src, dest) {
   try { await fs.link(src, dest); } catch { await fs.copyFile(src, dest); }
 }
 
+/**
+ * Removes the source after copying. On Unraid/NFS files sometimes stay open as
+ * .fuse_hidden, so give the handle a few seconds and only warn if it persists.
+ */
+async function removeSource(p) {
+  for (let i = 1; i <= 5; i++) {
+    try { await fs.rm(p, { recursive: true, force: true }); return; }
+    catch (e) {
+      if (i === 5) { console.warn('[spokarr] source left behind (' + (e && e.code) + '): ' + p); return; }
+      await new Promise((r) => setTimeout(r, 2000 * i));
+    }
+  }
+}
+
 async function importDownload(req, storage, keepSource) {
   const book = req.book;
   const author = safeName(book.authors[0] || 'Unknown');
@@ -148,7 +162,17 @@ async function importDownload(req, storage, keepSource) {
     if (st.isDirectory()) await linkOrCopy(storage, dest);
     else { await fs.mkdir(dest, { recursive: true }); await linkOrCopy(storage, path.join(dest, path.basename(storage))); }
   } else {
-    await fs.rename(storage, dest);
+    try {
+      await fs.rename(storage, dest);
+    } catch (e) {
+      // Downloads and library are two separate NFS exports, so rename() fails
+      // with EXDEV. Copy the content and remove the source afterwards.
+      if (!e || e.code !== 'EXDEV') throw e;
+      const st = await fs.stat(storage);
+      if (st.isDirectory()) await linkOrCopy(storage, dest);
+      else { await fs.mkdir(dest, { recursive: true }); await linkOrCopy(storage, path.join(dest, path.basename(storage))); }
+      await removeSource(storage);
+    }
     for (const f of await fs.readdir(dest)) {
       if (JUNK.test(f)) await fs.rm(path.join(dest, f), { force: true });
     }
