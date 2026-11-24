@@ -1,0 +1,16 @@
+{
+  "name": "spokarr",
+  "version": "0.1.0",
+  "description": "Request and download audiobooks for your Audiobookshelf library – Audible catalog, Newznab indexers, SABnzbd",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check public/app.js && node --check public/i18n.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "keywords": ["audiobooks", "audiobookshelf", "sabnzbd", "newznab", "arr", "selfhosted"]
+}

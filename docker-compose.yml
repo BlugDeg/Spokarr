@@ -1,0 +1,18 @@
+# Example setup. Adjust the volume paths to your system.
+services:
+  spokarr:
+    image: spokarr:latest
+    build: .
+    container_name: spokarr
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "5057:5057"
+    volumes:
+      - ./data:/data
+      # The same disk SABnzbd downloads to, so imports are a fast move
+      - /path/to/media:/media
+    # Run as the user that owns your media files
+    user: "1000:1000"
+    environment:
+      LIBRARY_DIR: /media/audiobooks

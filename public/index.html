@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1420">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Spokarr">
+  <title>Spokarr</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#/">
+      <img src="/logo.svg" alt="" width="36" height="36">
+      <span>Spokarr</span>
+    </a>
+    <nav>
+      <a href="#/" data-nav="discover"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.5 6.5-2 5-5 2 2-5 5-2Z"/></svg><span data-i18n="nav.discover">Discover</span></a>
+      <a href="#/requests" data-nav="requests"><svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4V4Z"/></svg><span data-i18n="nav.requests">Requests</span></a>
+      <a class="abs-link" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M4 13a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-1v-7h3M4 13h3v7H6a2 2 0 0 1-2-2v-5Z"/></svg><span data-i18n="nav.audiobookshelf">Audiobookshelf</span><span class="ext">↗</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <label class="lang">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <select class="lang-select" aria-label="Language"></select>
+      </label>
+      <div><span data-i18n="footer.data">Catalog data from Audible</span> · <span class="version"></span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <a class="brand brand-mobile" href="#/"><img src="/logo.svg" alt="" width="30" height="30"></a>
+      <form class="search" id="searchForm" autocomplete="off">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="searchInput" type="search" enterkeyhint="search">
+      </form>
+      <label class="lang lang-mobile">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span class="lang-code"></span>
+        <select class="lang-select" aria-label="Language"></select>
+      </label>
+    </header>
+    <main id="view"></main>
+  </div>
+
+  <nav class="bottomnav">
+    <a href="#/" data-nav="discover"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.5 6.5-2 5-5 2 2-5 5-2Z"/></svg><span data-i18n="nav.discover">Discover</span></a>
+    <a href="#/search" data-nav="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span data-i18n="nav.search">Search</span></a>
+    <a href="#/requests" data-nav="requests"><svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4V4Z"/></svg><span data-i18n="nav.requests">Requests</span></a>
+    <a class="abs-link" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M4 13a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-1v-7h3M4 13h3v7H6a2 2 0 0 1-2-2v-5Z"/></svg><span data-i18n="nav.listen">Listen</span></a>
+  </nav>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
