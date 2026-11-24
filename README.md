@@ -28,8 +28,9 @@ getting *the* recording you want – the unabridged one, read by your favourite 
 language – is guesswork.
 
 Spokarr starts from the **Audible catalog** instead. You pick the exact edition, Spokarr looks for a
-release that matches it on your indexers, sends it to SABnzbd and hands the finished book to
-Audiobookshelf – already matched, with cover, chapters and narrator.
+release that matches it on your indexers (directly or through Prowlarr), sends it to SABnzbd or
+qBittorrent and hands the finished book to Audiobookshelf – already matched, with cover, chapters and
+narrator.
 
 Everyone in your household signs in with their **Audiobookshelf account**, so there is nothing new to
 set up for them.
@@ -55,8 +56,11 @@ set up for them.
   lets you pick a release by hand.
 - 🗂️ **Clean import**: downloads are moved to `Author/Title`, get a `metadata.json` and a cover,
   Audiobookshelf scans and matches the book, and it is tagged “Requested by &lt;name&gt;”.
-- ⚙️ **Settings in the browser**: Audible store, discover rows, Audiobookshelf, SABnzbd and any number of
-  Newznab indexers – each with a connection test.
+- 🔌 **Prowlarr, SABnzbd and qBittorrent**: search all your Prowlarr indexers at once or add Newznab
+  indexers directly; usenet releases go to SABnzbd, torrents to qBittorrent. Torrents keep seeding –
+  Spokarr hardlinks (or copies) the files into the library.
+- ⚙️ **Settings in the browser**: Audible store, discover rows, Audiobookshelf, download clients, Prowlarr
+  and indexers – each with a connection test, plus path mapping when a client sees the disk differently.
 - 🪶 **Lightweight**: plain Node.js without dependencies and JSON files instead of a database – runs fine
   on a Raspberry Pi.
 
@@ -65,8 +69,10 @@ set up for them.
 | Book details | Requests |
 |---|---|
 | ![Book details with approval](docs/screenshots/book.png) | ![Requests with filters](docs/screenshots/requests.png) |
-| **Users** | **Settings** |
+| **Users** | **Prowlarr and indexers** |
 | ![User management](docs/screenshots/users.png) | ![Indexer settings](docs/screenshots/settings.png) |
+| **Download clients** | |
+| ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) | |
 
 <p align="center">
   <img src="docs/screenshots/mobile-discover.png" width="240" alt="Discover on a phone">
@@ -81,16 +87,16 @@ set up for them.
 ## How it works
 
 ```
- Audible catalog ──► you pick an edition ──► Newznab indexers ──► scored releases
-                                                                        │
- Audiobookshelf ◄── scan + match + tag ◄── import to Author/Title ◄── SABnzbd
+ Audible catalog ──► you pick an edition ──► Prowlarr / Newznab ──► scored releases
+                                                                          │
+ Audiobookshelf ◄── scan + match + tag ◄── import to Author/Title ◄── SABnzbd / qBittorrent
 ```
 
 ## Requirements
 
 - [Audiobookshelf](https://www.audiobookshelf.org/) **2.26 or newer** – used for sign-in and as the library
-- [SABnzbd](https://sabnzbd.org/)
-- At least one Newznab-compatible indexer with an audiobook category
+- A download client: [SABnzbd](https://sabnzbd.org/) (usenet) and/or [qBittorrent](https://www.qbittorrent.org/) 4.1+ (torrents)
+- Indexers: [Prowlarr](https://prowlarr.com/) and/or Newznab indexers with an audiobook category
 - Docker – or Node.js 20+
 
 ## Installation
@@ -155,10 +161,16 @@ Open `http://<host>:5057` and follow the setup:
 1. **Connect Audiobookshelf** – enter its address as the Spokarr server reaches it.
 2. **Sign in as an Audiobookshelf administrator.** You become the owner of Spokarr, and Spokarr creates
    its own API key in Audiobookshelf.
-3. Under **Settings**, add **SABnzbd** and your **indexers** and choose the Audiobookshelf **library**.
+3. Under **Settings**, add your **download clients** (SABnzbd, qBittorrent), **Prowlarr** or Newznab
+   **indexers**, and choose the Audiobookshelf **library**.
 
-In SABnzbd, create the category Spokarr uses (default `spokarr`). Put SABnzbd's download folder and the
-library on the **same disk**, so imports are an instant move instead of a copy.
+In your download clients, create the category Spokarr uses (default `spokarr`). Put the download folders
+and the library on the **same disk**: usenet downloads are then moved instantly, and torrents are
+hardlinked instead of copied. If a client runs in another container and sees the disk under another
+path, set the **path mapping** for that client.
+
+**Categories:** Spokarr searches category `3030` (Audio/Audiobook) by default. Some indexers file
+audiobooks only under `3000` (Audio) – add it if a search finds nothing.
 
 Other people can sign in right away with their Audiobookshelf accounts – or import them all under
 **Users**.
@@ -194,9 +206,11 @@ on their first sign-in; everyone else gets the default permissions from **Settin
 | Share of title words found in the release name | up to +60; below 75 % a release is never picked automatically |
 | Narrator's name in the release | +25 |
 | Release names the book's language / another language | +10 / −50 |
-| Dramatization or full-cast edition for a regular reading | −30 |
+| Dramatization, full-cast or radio adaptation for a regular reading | −30 |
 | Abridged release for an unabridged book | −25 |
 | Implausibly small for the runtime | −30 |
+| Torrent without seeders | −40, never picked automatically |
+| No download client for the release type (usenet/torrent) | never picked automatically |
 
 A release is picked automatically at 50 points or more. Everything else can be chosen under
 **View releases**.

@@ -150,7 +150,7 @@ async function loadReleases(b) {
         <div class="score ${r.ok ? 'good' : r.score < 30 ? 'bad' : ''}">${r.score}</div>
         <div>
           <div class="name">${esc(r.title)}</div>
-          <div class="why"><span>${size(r.size)}</span><span>${esc(r.indexer)}</span>${r.pubDate ? `<span>${since(r.pubDate)}</span>` : ''}${r.plus.map((x) => `<span class="pos">✓ ${esc(t('rel.plus.' + x))}</span>`).join('')}${r.minus.map((x) => `<span class="neg">✕ ${esc(t('rel.minus.' + x))}</span>`).join('')}</div>
+          <div class="why"><span class="proto proto-${r.protocol === 'torrent' ? 'torrent' : 'usenet'}">${r.protocol === 'torrent' ? 'Torrent' : 'Usenet'}</span><span>${size(r.size)}</span>${r.seeders != null ? `<span>${esc(t('rel.seeders', { n: r.seeders }))}</span>` : ''}<span>${esc(r.indexer)}</span>${r.pubDate ? `<span>${since(r.pubDate)}</span>` : ''}${r.plus.map((x) => `<span class="pos">✓ ${esc(t('rel.plus.' + x))}</span>`).join('')}${r.minus.map((x) => `<span class="neg">✕ ${esc(t('rel.minus.' + x))}</span>`).join('')}</div>
         </div>
         <button class="btn btn-sm ${r.ok ? 'btn-primary' : 'btn-ghost'}" data-guid="${esc(r.guid)}">${icon.down}${esc(t('rel.download'))}</button>
       </div>`).join('') : `<div class="rel"><div></div><div class="name">${esc(t('rel.none'))}</div></div>`;

@@ -1,7 +1,8 @@
 // Newznab indexers and release scoring
 import { contentLanguage } from './audible.mjs';
+import { clientFor } from './downloads.mjs';
 import { state } from './store.mjs';
-import { cleanTitle, decodeXml, GERMAN_TRANSLIT, log, norm, trimUrl, UserError } from './util.mjs';
+import { cleanTitle, decodeXml, fetchJson, GERMAN_TRANSLIT, log, norm, trimUrl, UserError } from './util.mjs';
 
 function parseNewznab(xml) {
   const items = [];
@@ -54,7 +55,48 @@ export async function testIndexer(ix) {
 
 async function search(ix, q) {
   const xml = await query(ix, { t: 'search', q, cat: ix.categories || '3030', limit: '100' });
-  return parseNewznab(xml).map((r) => ({ ...r, indexer: ix.name, indexerId: ix.id }));
+  return parseNewznab(xml).map((r) => ({ ...r, indexer: ix.name, indexerId: ix.id, protocol: 'usenet' }));
+}
+
+// ---------- Prowlarr ----------
+export const prowlarrEnabled = (conf = state.settings.prowlarr) => !!conf && conf.enabled === true && !!(conf.url && conf.apiKey);
+const prowlarrHeaders = (conf) => ({ 'X-Api-Key': conf.apiKey, Accept: 'application/json' });
+
+/** Connection test: version and the indexers configured in Prowlarr. */
+export async function testProwlarr(conf) {
+  if (!conf.url || !conf.apiKey) throw new UserError('prowlarr_incomplete');
+  const base = trimUrl(conf.url);
+  const status = await fetchJson(`${base}/api/v1/system/status`, { headers: prowlarrHeaders(conf) }, 10000)
+    .catch((e) => { throw new UserError(e.status === 401 ? 'prowlarr_bad_key' : 'prowlarr_unreachable', { url: base }); });
+  const ix = await fetchJson(`${base}/api/v1/indexer`, { headers: prowlarrHeaders(conf) }, 10000).catch(() => []);
+  return {
+    version: status.version,
+    indexers: (ix || []).filter((i) => i.enable).map((i) => ({ name: i.name, protocol: i.protocol })),
+  };
+}
+
+/** One search across all indexers in Prowlarr (usenet and torrent). */
+async function searchProwlarr(q) {
+  const conf = state.settings.prowlarr;
+  const u = new URL(`${trimUrl(conf.url)}/api/v1/search`);
+  u.searchParams.set('query', q);
+  u.searchParams.set('type', 'search');
+  u.searchParams.set('limit', '100');
+  for (const c of String(conf.categories || '3030').split(',').map((x) => x.trim()).filter(Boolean)) u.searchParams.append('categories', c);
+  const list = await fetchJson(u, { headers: prowlarrHeaders(conf) }, 45000)
+    .catch((e) => { throw new UserError(e.status === 401 ? 'prowlarr_bad_key' : 'prowlarr_unreachable', { url: conf.url }); });
+  return (Array.isArray(list) ? list : []).map((r) => ({
+    title: r.title || '',
+    guid: r.guid || r.downloadUrl || r.magnetUrl,
+    link: r.downloadUrl || r.magnetUrl || '',
+    size: Number(r.size) || 0,
+    cats: (r.categories || []).map((c) => c.id),
+    pubDate: r.publishDate || '',
+    indexer: r.indexer ? `${r.indexer} (Prowlarr)` : 'Prowlarr',
+    indexerId: `prowlarr:${r.indexerId}`,
+    protocol: r.protocol === 'torrent' ? 'torrent' : 'usenet',
+    seeders: r.protocol === 'torrent' ? Number(r.seeders) || 0 : null,
+  })).filter((r) => r.link);
 }
 
 // Words that mark the language of a release name
@@ -90,7 +132,7 @@ export function scoreRelease(book, rel) {
   if (named.includes(bookLang)) { s += 10; plus.push('language'); }
   else if ((bookLang !== 'english' && looksEnglish) || named.some((l) => l !== bookLang)) { s -= 50; minus.push('wrong_language'); }
 
-  const isDrama = (t) => /\bhoerspiel\b|full cast|dramati[sz]ed|audio drama/.test(t);
+  const isDrama = (t) => /\bhoerspiel\b|full cast|dramati[sz](?:ed|ation)|audio drama|radio (?:drama|play|adapt\w*)|\bbbc radio\b/.test(t);
   if (isDrama(n) && !isDrama(norm(book.title + ' ' + book.subtitle))) { s -= 30; minus.push('drama'); }
   const unabr = /\bungekuerzt\b|\bunabridged\b/.test(n);
   const abr = !unabr && /\bgekuerzt\b|\babridged\b/.test(n);
@@ -102,26 +144,37 @@ export function scoreRelease(book, rel) {
     if (mbPerMin < 0.15) { s -= 30; minus.push('too_small'); }
     else if (mbPerMin > 4) { s -= 10; minus.push('too_large'); }
   }
-  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language'), minus, plus };
+  if (rel.protocol === 'torrent' && rel.seeders === 0) { s -= 40; minus.push('no_seeders'); }
+  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language') && !minus.includes('no_seeders'), minus, plus };
 }
 
 export async function findReleases(book) {
   const indexers = (state.settings.indexers || []).filter((i) => i.enabled && i.url && i.apiKey);
-  if (!indexers.length) throw new UserError('indexer_not_configured');
+  const useProwlarr = prowlarrEnabled();
+  if (!indexers.length && !useProwlarr) throw new UserError('indexer_not_configured');
   const base = cleanTitle(book.title);
   const queries = [...new Set([base, GERMAN_TRANSLIT(base)])].filter(Boolean);
   const seen = new Map();
   const errors = [];
-  await Promise.all(indexers.map(async (ix) => {
+  const sources = [
+    ...indexers.map((ix) => ({ name: ix.name, run: (q) => search(ix, q) })),
+    ...(useProwlarr ? [{ name: 'Prowlarr', run: searchProwlarr }] : []),
+  ];
+  await Promise.all(sources.map(async (src) => {
     for (const q of queries) {
       try {
-        for (const r of await search(ix, q)) if (!seen.has(r.guid)) seen.set(r.guid, r);
-      } catch (e) { errors.push(e); log('Indexer search failed:', ix.name, q, e.message); }
+        for (const r of await src.run(q)) if (!seen.has(r.guid)) seen.set(r.guid, r);
+      } catch (e) { errors.push(e); log('Search failed:', src.name, q, e.message); }
     }
   }));
   if (!seen.size && errors.length) throw errors[0];
   return [...seen.values()]
-    .map((r) => ({ ...r, ...scoreRelease(book, r) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 30);
+    .map((r) => {
+      const sc = scoreRelease(book, r);
+      // a release is only usable if a download client for its protocol is set up
+      if (!clientFor(r.protocol)) { sc.minus.push('no_client'); sc.ok = false; }
+      return { ...r, ...sc };
+    })
+    .sort((a, b) => b.score - a.score || (b.seeders ?? 0) - (a.seeders ?? 0))
+    .slice(0, 40);
 }

@@ -48,9 +48,25 @@ function settingsFromEnv() {
       libraryMount: env.ABS_LIBRARY_MOUNT || LIBRARY_DIR,
     },
     sab: {
+      enabled: true,
       url: trimUrl(env.SAB_URL),
       apiKey: env.SAB_API_KEY || '',
       category: env.SAB_CATEGORY || 'spokarr',
+      pathFrom: '', pathTo: '',
+    },
+    qbit: {
+      enabled: !!env.QBIT_URL,
+      url: trimUrl(env.QBIT_URL),
+      username: env.QBIT_USERNAME || '',
+      password: env.QBIT_PASSWORD || '',
+      category: env.QBIT_CATEGORY || 'spokarr',
+      pathFrom: '', pathTo: '',
+    },
+    prowlarr: {
+      enabled: !!env.PROWLARR_URL,
+      url: trimUrl(env.PROWLARR_URL),
+      apiKey: env.PROWLARR_API_KEY || '',
+      categories: env.PROWLARR_CATEGORIES || '3030',
     },
     indexers: env.NEWZNAB_URL ? [{
       id: randomId(4), name: 'Indexer', url: trimUrl(env.NEWZNAB_URL), apiKey: env.NEWZNAB_API_KEY || '',
@@ -72,7 +88,14 @@ export async function loadState() {
   const seed = settingsFromEnv();
   const stored = await readJson('settings.json', null);
   state.settings = stored
-    ? { ...seed, ...stored, general: { ...seed.general, ...stored.general }, abs: { ...seed.abs, ...stored.abs }, sab: { ...seed.sab, ...stored.sab } }
+    ? {
+      ...seed, ...stored,
+      general: { ...seed.general, ...stored.general },
+      abs: { ...seed.abs, ...stored.abs },
+      sab: { ...seed.sab, ...stored.sab },
+      qbit: { ...seed.qbit, ...stored.qbit },
+      prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
+    }
     : seed;
   if (!stored) { await save.settings(); log('Created settings.json from environment variables'); }
   state.users = await readJson('users.json', []);

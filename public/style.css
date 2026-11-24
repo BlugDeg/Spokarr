@@ -367,3 +367,15 @@ code { background: var(--panel-2); padding: 2px 6px; border-radius: 6px; font-si
   .req .side { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
   .side-actions { flex-wrap: nowrap; margin-left: auto; }
 }
+
+/* v0.3: download clients, Prowlarr */
+.indexer-head h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.indexer-head h2 .pill { font-size: 11px; font-weight: 700; }
+.subhead { font-size: 17px; margin: 26px 0 12px; }
+details.advanced { margin: 4px 0 14px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; }
+details.advanced summary { cursor: pointer; color: var(--muted); font-weight: 600; font-size: 14px; }
+details.advanced[open] summary { margin-bottom: 8px; }
+details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
+.proto { font-weight: 700; border-radius: 6px; padding: 0 6px; }
+.proto-usenet { background: rgba(99,102,241,.18); color: #c7d2fe; }
+.proto-torrent { background: rgba(16,185,129,.18); color: #6ee7b7; }

@@ -119,30 +119,64 @@ function bindAbs() {
   });
 }
 
-// ---------- Download client ----------
+// ---------- Download clients ----------
+const pathFields = (c) => `
+  <details class="advanced"${c.pathFrom ? ' open' : ''}><summary>${esc(t('settings.pathMapping'))}</summary>
+    <p class="muted">${esc(t('settings.pathMappingHint', { dir: data.libraryDir }))}</p>
+    <div class="grid-2">
+      ${field(t('settings.pathFrom'), text('pathFrom', c.pathFrom, 'placeholder="/downloads"'))}
+      ${field(t('settings.pathTo'), text('pathTo', c.pathTo, 'placeholder="/media/downloads"'))}
+    </div>
+  </details>`;
 function downloads() {
   const s = data.sab;
+  const q = data.qbit;
   return `<form id="f">
-    ${section('SABnzbd', `
+    <section class="panel settings-section client" data-client="sab">
+      <div class="indexer-head"><h2>SABnzbd <span class="pill">Usenet</span></h2>${toggle('enabled', s.enabled !== false, t('settings.indexerEnabled'))}</div>
       ${field(t('settings.sabUrl'), text('url', s.url, 'type="url" placeholder="http://sabnzbd:8080"'))}
       ${field(t('settings.apiKey'), keyInput('apiKey', s.hasApiKey), t('settings.sabKeyHint'))}
-      ${field(t('settings.sabCategory'), text('category', s.category, 'placeholder="spokarr"'), t('settings.sabCategoryHint'))}`)}
-    ${saveBar(`<button type="button" class="btn btn-ghost" id="test">${icon.plug}${esc(t('settings.test'))}</button>`)}
+      ${field(t('settings.sabCategory'), text('category', s.category, 'placeholder="spokarr"'), t('settings.sabCategoryHint'))}
+      ${pathFields(s)}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
+    </section>
+    <section class="panel settings-section client" data-client="qbit">
+      <div class="indexer-head"><h2>qBittorrent <span class="pill">Torrent</span></h2>${toggle('enabled', q.enabled === true, t('settings.indexerEnabled'))}</div>
+      ${field(t('settings.qbitUrl'), text('url', q.url, 'type="url" placeholder="http://qbittorrent:8080"'), t('settings.qbitUrlHint'))}
+      <div class="grid-2">
+        ${field(t('login.username'), text('username', q.username, 'autocomplete="off"'))}
+        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(q.hasPassword ? t('settings.keyStored') : '')}">`)}
+      </div>
+      ${field(t('settings.sabCategory'), text('category', q.category, 'placeholder="spokarr"'), t('settings.qbitCategoryHint'))}
+      ${pathFields(q)}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
+    </section>
+    ${saveBar()}
   </form>`;
 }
 function bindDownloads() {
   const f = document.getElementById('f');
-  const values = () => ({ url: f.url.value, apiKey: f.apiKey.value, category: f.category.value });
-  f.querySelector('#test').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+  const read = (sec) => ({
+    enabled: sec.querySelector('[name=enabled]').checked,
+    ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.name, i.value])),
+  });
+  f.querySelectorAll('[data-client]').forEach((sec) => sec.querySelector('[data-test]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    const out = sec.querySelector('[data-result]');
+    const client = sec.dataset.client;
     try {
-      const r = await post('/api/settings/test/sab', values());
-      showTest(r.categoryExists, r.categoryExists ? `${t('settings.testOk')} · SABnzbd ${r.version}` : t('settings.sabCategoryMissing', { cat: f.category.value }));
-    } catch (err) { showTest(false, errText(err)); }
-  }));
+      const r = await post(`/api/settings/test/${client}`, read(sec));
+      const name = client === 'sab' ? 'SABnzbd' : 'qBittorrent';
+      const okCat = r.categoryExists;
+      out.className = 'test-result ' + (okCat ? 'ok' : 'err');
+      out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}` : t('settings.sabCategoryMissing', { cat: read(sec).category }));
+    } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
+  })));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
+    const body = {};
+    f.querySelectorAll('[data-client]').forEach((sec) => { body[sec.dataset.client] = read(sec); });
     busy(f.querySelector('[type=submit]'), async () => {
-      try { await save({ sab: values() }); pageSettings('downloads'); } catch (err) { toast(errText(err), 'err'); }
+      try { await save(body); pageSettings('downloads'); } catch (err) { toast(errText(err), 'err'); }
     });
   });
 }
@@ -167,7 +201,19 @@ const indexerCard = (ix = { enabled: true, categories: '3030' }) => `
   </section>`;
 function indexers() {
   const list = data.indexers || [];
+  const p = data.prowlarr || {};
   return `<form id="f">
+    <section class="panel settings-section" id="prowlarr">
+      <div class="indexer-head"><h2>Prowlarr</h2>${toggle('enabled', p.enabled === true, t('settings.indexerEnabled'))}</div>
+      <p class="muted">${esc(t('settings.prowlarrHint'))}</p>
+      <div class="grid-2">
+        ${field(t('settings.indexerUrl'), text('url', p.url, 'type="url" placeholder="http://prowlarr:9696"'))}
+        ${field(t('settings.apiKey'), keyInput('apiKey', p.hasApiKey), t('settings.prowlarrKeyHint'))}
+      </div>
+      ${field(t('settings.indexerCategories'), text('categories', p.categories || '3030'), t('settings.indexerCategoriesHint'))}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
+    </section>
+    <h2 class="subhead">${esc(t('settings.newznabIndexers'))}</h2>
     <div id="ixList">${list.length ? list.map(indexerCard).join('') : `<p class="muted" id="noIx">${esc(t('settings.noIndexers'))}</p>`}</div>
     <button type="button" class="btn btn-ghost" id="addIx">${icon.plus}${esc(t('settings.addIndexer'))}</button>
     ${saveBar()}
@@ -176,11 +222,21 @@ function indexers() {
 function bindIndexers() {
   const f = document.getElementById('f');
   const list = f.querySelector('#ixList');
+  const prow = f.querySelector('#prowlarr');
+  const readProw = () => ({ enabled: prow.querySelector('[name=enabled]').checked, url: prow.querySelector('[name=url]').value, apiKey: prow.querySelector('[name=apiKey]').value, categories: prow.querySelector('[name=categories]').value });
   const read = (card) => ({
     id: card.dataset.id || undefined,
     ...Object.fromEntries([...card.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value])),
     enabled: card.querySelector('[name=enabled]').checked,
   });
+  prow.querySelector('[data-test]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    const out = prow.querySelector('[data-result]');
+    try {
+      const r = await post('/api/settings/test/prowlarr', readProw());
+      out.className = 'test-result ok';
+      out.innerHTML = icon.check + esc(`${t('settings.testOk')} · Prowlarr ${r.version}`) + `<small>${esc(t('settings.prowlarrIndexers', { n: r.indexers.length, list: r.indexers.map((i) => `${i.name} (${i.protocol})`).join(', ') || '–' }))}</small>`;
+    } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
+  }));
   f.querySelector('#addIx').addEventListener('click', () => { f.querySelector('#noIx')?.remove(); list.insertAdjacentHTML('beforeend', indexerCard()); });
   list.addEventListener('click', async (e) => {
     const card = e.target.closest('.indexer');
@@ -199,7 +255,7 @@ function bindIndexers() {
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     busy(f.querySelector('[type=submit]'), async () => {
-      try { await save({ indexers: [...list.querySelectorAll('.indexer')].map(read) }); pageSettings('indexers'); } catch (err) { toast(errText(err), 'err'); }
+      try { await save({ prowlarr: readProw(), indexers: [...list.querySelectorAll('.indexer')].map(read) }); pageSettings('indexers'); } catch (err) { toast(errText(err), 'err'); }
     });
   });
 }

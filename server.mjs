@@ -7,10 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { absEnabled, absLibraries, absStatus, absUsers } from './src/abs.mjs';
 import { contentLanguage, discoverRows, getBook, REGIONS, searchAudible } from './src/audible.mjs';
 import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired } from './src/auth.mjs';
-import { findReleases, testIndexer } from './src/indexers.mjs';
+import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
   ACTIVE, approveRequest, createRequest, declineRequest, poll, publicRequest, requestWithRelease, statusResolver,
 } from './src/requests.mjs';
+import { testQbit } from './src/qbit.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
 import { cached, log, randomId, trimUrl, uncache, UserError } from './src/util.mjs';
@@ -26,7 +27,9 @@ async function annotate(books) {
 }
 const mask = (s) => {
   const out = structuredClone(s);
-  for (const sec of [out.abs, out.sab]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
+  for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
+  out.qbit.hasPassword = !!out.qbit.password;
+  out.qbit.password = '';
   out.indexers = (out.indexers || []).map((i) => ({ ...i, hasApiKey: !!i.apiKey, apiKey: '' }));
   out.libraryDir = LIBRARY_DIR;
   return out;
@@ -68,12 +71,35 @@ function applySettings(body) {
       libraryMount: a.libraryMount !== undefined ? String(a.libraryMount).trim() : s.abs.libraryMount,
     };
   }
+  const str = (v, old) => (v !== undefined ? String(v).trim() : old);
   if (body.sab) {
     const b = body.sab;
     s.sab = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.sab.enabled,
       url: b.url !== undefined ? trimUrl(b.url) : s.sab.url,
       apiKey: keepKey(b.apiKey, s.sab.apiKey),
       category: b.category !== undefined ? String(b.category).trim() || 'spokarr' : s.sab.category,
+      pathFrom: str(b.pathFrom, s.sab.pathFrom), pathTo: str(b.pathTo, s.sab.pathTo),
+    };
+  }
+  if (body.qbit) {
+    const b = body.qbit;
+    s.qbit = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.qbit.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.qbit.url,
+      username: str(b.username, s.qbit.username),
+      password: keepKey(b.password, s.qbit.password),
+      category: str(b.category, s.qbit.category),
+      pathFrom: str(b.pathFrom, s.qbit.pathFrom), pathTo: str(b.pathTo, s.qbit.pathTo),
+    };
+  }
+  if (body.prowlarr) {
+    const b = body.prowlarr;
+    s.prowlarr = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.prowlarr.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.prowlarr.url,
+      apiKey: keepKey(b.apiKey, s.prowlarr.apiKey),
+      categories: b.categories !== undefined ? String(b.categories).replace(/[^0-9,]/g, '') || '3030' : s.prowlarr.categories,
     };
   }
   if (Array.isArray(body.indexers)) {
@@ -237,6 +263,16 @@ route('POST', '/api/settings/test/sab', ADMIN, async ({ body }) => testSab({
   url: trimUrl(body.url ?? state.settings.sab.url),
   apiKey: keepKey(body.apiKey, state.settings.sab.apiKey),
   category: body.category ?? state.settings.sab.category,
+}));
+route('POST', '/api/settings/test/qbit', ADMIN, async ({ body }) => testQbit({
+  url: trimUrl(body.url ?? state.settings.qbit.url),
+  username: body.username ?? state.settings.qbit.username,
+  password: keepKey(body.password, state.settings.qbit.password),
+  category: body.category ?? state.settings.qbit.category,
+}));
+route('POST', '/api/settings/test/prowlarr', ADMIN, async ({ body }) => testProwlarr({
+  url: trimUrl(body.url ?? state.settings.prowlarr.url),
+  apiKey: keepKey(body.apiKey, state.settings.prowlarr.apiKey),
 }));
 route('POST', '/api/settings/test/indexer', ADMIN, async ({ body }) => {
   const stored = (state.settings.indexers || []).find((i) => i.id === body.id);

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { absAddTags, absEnabled, absItems, absMatch, absScan } from './abs.mjs';
 import { getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
-import { sab, sendToSab } from './sab.mjs';
+import { clientStatus, startClientDownload } from './downloads.mjs';
 import { LIBRARY_DIR, save, state } from './store.mjs';
 import { cleanTitle, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
 
@@ -20,7 +20,7 @@ export function publicRequest(r) {
   return {
     id: r.id, asin: r.asin, status: r.status, progress: r.progress || 0, eta: r.eta || '',
     message: r.message || null, createdAt: r.createdAt, updatedAt: r.updatedAt,
-    release: r.release ? { title: r.release.title, size: r.release.size, indexer: r.release.indexer } : null,
+    release: r.release ? { title: r.release.title, size: r.release.size, indexer: r.release.indexer, protocol: r.release.protocol || 'usenet' } : null,
     book: r.book, absId: r.absId || null,
     requestedBy: u ? { id: u.id, username: u.username } : null,
     decidedBy: a ? { id: a.id, username: a.username } : null,
@@ -46,14 +46,14 @@ export async function statusResolver() {
 async function startDownload(req, guid) {
   const releases = await findReleases(req.book);
   const rel = guid ? releases.find((r) => r.guid === guid) : releases.find((r) => r.ok);
-  Object.assign(req, { progress: 0, message: null, release: null, nzo: null, eta: '', updatedAt: new Date().toISOString() });
+  Object.assign(req, { progress: 0, message: null, release: null, nzo: null, download: null, misses: 0, eta: '', updatedAt: new Date().toISOString() });
   if (!rel) {
     req.status = 'not_found';
     req.message = releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found');
     return;
   }
-  req.nzo = await sendToSab(req.book, rel);
-  req.release = { title: rel.title, size: rel.size, guid: rel.guid, indexer: rel.indexer };
+  req.download = await startClientDownload(req, rel);
+  req.release = { title: rel.title, size: rel.size, guid: rel.guid, indexer: rel.indexer, protocol: rel.protocol || 'usenet' };
   req.status = 'downloading';
   log('Downloading', req.book.title, '→', rel.title);
 }
@@ -108,16 +108,37 @@ export async function declineRequest(admin, id) {
   return req;
 }
 
-async function importDownload(req, storage) {
+const JUNK = /\.(par2|nzb|sfv|srr|nfo|url|torrent|exe|lnk)$/i;
+
+/** Hardlink (same disk, no extra space) or copy – used for torrents, which must keep seeding. */
+async function linkOrCopy(src, dest) {
+  const st = await fs.stat(src);
+  if (st.isDirectory()) {
+    await fs.mkdir(dest, { recursive: true });
+    for (const f of await fs.readdir(src)) await linkOrCopy(path.join(src, f), path.join(dest, f));
+    return;
+  }
+  if (JUNK.test(src)) return;
+  try { await fs.link(src, dest); } catch { await fs.copyFile(src, dest); }
+}
+
+async function importDownload(req, storage, keepSource) {
   const book = req.book;
   const author = safeName(book.authors[0] || 'Unknown');
   const title = safeName(cleanTitle(book.title));
   let dest = path.join(LIBRARY_DIR, author, title);
   for (let i = 2; fss.existsSync(dest); i++) dest = path.join(LIBRARY_DIR, author, `${title} (${i})`);
   await fs.mkdir(path.dirname(dest), { recursive: true });
-  await fs.rename(storage, dest);
-  for (const f of await fs.readdir(dest)) {
-    if (/\.(par2|nzb|sfv|srr|nfo|url)$/i.test(f)) await fs.rm(path.join(dest, f), { force: true });
+  if (keepSource) {
+    // a single-file torrent becomes a folder with that file
+    const st = await fs.stat(storage);
+    if (st.isDirectory()) await linkOrCopy(storage, dest);
+    else { await fs.mkdir(dest, { recursive: true }); await linkOrCopy(storage, path.join(dest, path.basename(storage))); }
+  } else {
+    await fs.rename(storage, dest);
+    for (const f of await fs.readdir(dest)) {
+      if (JUNK.test(f)) await fs.rm(path.join(dest, f), { force: true });
+    }
   }
   // Audiobookshelf metadata file, read on scan
   const meta = {
@@ -165,27 +186,37 @@ export async function poll() {
   if (polling) return;
   polling = true;
   try {
-    const active = state.requests.filter((r) => r.status === 'downloading' && r.nzo);
+    for (const req of state.requests) {
+      // requests from 0.2.x only knew SABnzbd
+      if (req.status === 'downloading' && req.nzo && !req.download) req.download = { client: 'sab', ref: req.nzo };
+    }
+    const active = state.requests.filter((r) => r.status === 'downloading' && r.download);
     if (!active.length) return;
-    const q = await sab({ mode: 'queue', limit: 200 });
-    const slots = new Map((q.queue?.slots || []).map((s) => [s.nzo_id, s]));
     for (const req of active) {
-      const s = slots.get(req.nzo);
-      if (s) {
-        req.progress = Number(s.percentage) || 0;
-        req.eta = s.timeleft || '';
-        req.message = s.status === 'Paused' ? msg('paused') : null;
+      let st;
+      try { st = await clientStatus(req.download); } catch (e) { log('Download status failed:', req.book.title, e.message); continue; }
+      if (st.state === 'downloading') {
+        req.progress = st.progress || 0;
+        req.eta = st.eta || '';
+        req.misses = 0;
+        req.message = st.paused ? msg('paused') : st.message ? msg('sab_status', { status: st.message }) : null;
         continue;
       }
-      const h = await sab({ mode: 'history', nzo_ids: req.nzo });
-      const slot = h.history?.slots?.[0];
-      if (!slot) continue;
-      if (slot.status === 'Completed') {
+      if (st.state === 'missing') {
+        // a torrent added by URL takes a moment to show up; give up after about five minutes
+        req.misses = (req.misses || 0) + 1;
+        if (req.misses > 20) { req.status = 'failed'; req.message = msg('download_failed', { error: 'not found in download client' }); }
+        continue;
+      }
+      if (st.state === 'failed') {
+        req.status = 'failed';
+        req.message = msg('download_failed', { error: st.message || '' });
+      } else if (st.state === 'done') {
         req.status = 'processing';
         req.progress = 100;
         await save.requests();
         try {
-          await importDownload(req, slot.storage);
+          await importDownload(req, st.path, !!st.keep);
           const ok = await linkInAbs(req);
           req.status = 'available';
           req.message = ok ? null : msg('not_scanned_yet');
@@ -194,17 +225,12 @@ export async function poll() {
           req.message = msg('import_failed', { error: e.message });
           log('Import failed', req.book.title, e);
         }
-      } else if (slot.status === 'Failed') {
-        req.status = 'failed';
-        req.message = msg('download_failed', { error: slot.fail_message || '' });
-      } else {
-        req.message = msg('sab_status', { status: slot.status });
       }
       req.updatedAt = new Date().toISOString();
     }
     await save.requests();
   } catch (e) {
-    log('SABnzbd sync failed:', e.message);
+    log('Download sync failed:', e.message);
   } finally {
     polling = false;
   }
