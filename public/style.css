@@ -364,4 +364,6 @@ code { background: var(--panel-2); padding: 2px 6px; border-radius: 6px; font-si
   .settings-section { padding: 16px; }
   .tabs a { padding: 10px 12px; }
   .indexer-head { flex-wrap: wrap; }
+  .req .side { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .side-actions { flex-wrap: nowrap; margin-left: auto; }
 }

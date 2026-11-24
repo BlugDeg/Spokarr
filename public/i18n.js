@@ -111,7 +111,7 @@ const dict = {
     'err.invalid_asin': 'Invalid ASIN.', 'err.invalid_region': 'Unknown Audible store.', 'err.not_found': 'Not found.',
     'err.upstream': 'A connected service did not respond: {message}', 'err.generic': 'Error {code}',
 
-    'time.justNow': 'just now', 'time.minAgo': '{n} min ago', 'time.hAgo': '{n} h ago', 'time.dAgo': '{n} days ago',
+    'time.justNow': 'just now', 'time.minAgo': '{n} min ago', 'time.hAgo': '{n} h ago', 'time.dAgo': '{n} days ago', 'time.dAgo1': '1 day ago',
     'dur.hm': '{h} h {m} min', 'dur.m': '{m} min', 'footer.data': 'Catalog data from Audible', 'lang.label': 'Language',
     'common.cancel': 'Cancel', 'common.yes': 'Yes', 'common.no': 'No', 'common.loading': 'Loading…',
   },
@@ -223,7 +223,7 @@ const dict = {
     'err.invalid_asin': 'Ungültige ASIN.', 'err.invalid_region': 'Unbekannter Audible-Shop.', 'err.not_found': 'Nicht gefunden.',
     'err.upstream': 'Ein verbundener Dienst antwortet nicht: {message}', 'err.generic': 'Fehler {code}',
 
-    'time.justNow': 'gerade eben', 'time.minAgo': 'vor {n} Min.', 'time.hAgo': 'vor {n} Std.', 'time.dAgo': 'vor {n} Tagen',
+    'time.justNow': 'gerade eben', 'time.minAgo': 'vor {n} Min.', 'time.hAgo': 'vor {n} Std.', 'time.dAgo': 'vor {n} Tagen', 'time.dAgo1': 'vor 1 Tag',
     'dur.hm': '{h} Std. {m} Min.', 'dur.m': '{m} Min.', 'footer.data': 'Katalogdaten von Audible', 'lang.label': 'Sprache',
     'common.cancel': 'Abbrechen', 'common.yes': 'Ja', 'common.no': 'Nein', 'common.loading': 'Lädt …',
   },

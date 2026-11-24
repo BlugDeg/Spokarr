@@ -210,6 +210,6 @@ function about() {
     <div>${esc(t('settings.version'))}</div><div>${esc(session.status?.version || '')}</div>
     <div>${esc(t('settings.dataDir'))}</div><div><code>${esc(data.libraryDir)}</code></div>
     <div>Audible</div><div>${esc(REGION_NAMES[data.general.region] || data.general.region)}</div>
-    <div>${esc(t('settings.source'))}</div><div><a href="https://github.com/" target="_blank" rel="noopener">GitHub</a></div>
+    <div>${esc(t('settings.source'))}</div><div><a href="https://github.com/BlugDeg/Spokarr" target="_blank" rel="noopener">GitHub</a></div>
   </div>`);
 }

@@ -63,7 +63,7 @@ export const since = (d) => {
   if (s < 60) return t('time.justNow');
   if (s < 3600) return t('time.minAgo', { n: Math.floor(s / 60) });
   if (s < 86400) return t('time.hAgo', { n: Math.floor(s / 3600) });
-  if (s < 7 * 86400) return t('time.dAgo', { n: Math.floor(s / 86400) });
+  if (s < 7 * 86400) return Math.floor(s / 86400) === 1 ? t('time.dAgo1') : t('time.dAgo', { n: Math.floor(s / 86400) });
   return date(d);
 };
 
