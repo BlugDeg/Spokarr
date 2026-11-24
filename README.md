@@ -130,7 +130,7 @@ docker run -d --name spokarr --restart unless-stopped \
   -v ./data:/data \
   -v /path/to/media:/media \
   -e LIBRARY_DIR=/media/audiobooks \
-  --user 1000:1000 \
+  -e PUID=1000 -e PGID=1000 \
   ghcr.io/blugdeg/spokarr:latest
 ```
 
@@ -149,7 +149,8 @@ services:
       - /path/to/media:/media        # the disk with SABnzbd's downloads and your audiobooks
     environment:
       LIBRARY_DIR: /media/audiobooks # where Spokarr puts finished audiobooks
-    user: "1000:1000"                # the user that owns your media files
+      PUID: 1000                     # the user that owns your media files
+      PGID: 1000
 ```
 
 ```bash
@@ -157,6 +158,19 @@ docker compose up -d
 ```
 
 **Updating:** `docker compose pull && docker compose up -d`. Your settings in `data/` are kept.
+
+### Unraid
+
+Until Spokarr is in Community Applications, install the template once – open the Unraid terminal and run
+
+```bash
+wget -O /boot/config/plugins/dockerMan/templates-user/my-Spokarr.xml \
+  https://raw.githubusercontent.com/BlugDeg/Spokarr/main/unraid/spokarr.xml
+```
+
+then **Docker → Add Container → Template: Spokarr**. Set *Media* to the share that holds both your
+downloads and your Audiobookshelf library (e.g. `/mnt/user/data`) and *Library folder* to the
+audiobook folder inside it (e.g. `/media/media/audiobooks`). Spokarr runs as `nobody:users` (99:100).
 
 ### Without Docker
 
@@ -196,6 +210,7 @@ Everything is configured in the web interface and stored in `data/settings.json`
 | `PORT` | Port of the web interface (default `5057`) |
 | `DATA_DIR` | Folder for settings, users and requests (default `/data`) |
 | `LIBRARY_DIR` | Folder where finished audiobooks are placed (default `/audiobooks`) |
+| `PUID`, `PGID` | User and group Spokarr runs as (default `1000`; Unraid `99`/`100`). The data folder is handed to this user on start |
 
 All other variables in [`.env.example`](.env.example) are optional and only read on the very first start
 to pre-fill the settings – handy for automated deployments.

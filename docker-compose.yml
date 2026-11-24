@@ -12,5 +12,5 @@ services:
       - /path/to/media:/media
     environment:
       LIBRARY_DIR: /media/audiobooks # where Spokarr puts finished audiobooks
-    # Run as the user that owns your media files
-    user: "1000:1000"
+      PUID: 1000                     # run as the user that owns your media files
+      PGID: 1000

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Spokarr</Name>
+  <Repository>ghcr.io/blugdeg/spokarr:latest</Repository>
+  <Registry>https://github.com/BlugDeg/Spokarr/pkgs/container/spokarr</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/BlugDeg/Spokarr/issues</Support>
+  <Project>https://github.com/BlugDeg/Spokarr</Project>
+  <Overview>Request audiobooks like you request movies in Seerr. Pick the exact edition from the Audible catalog (narrator, unabridged, language); Spokarr finds a matching release through Prowlarr or Newznab indexers, downloads it with SABnzbd or qBittorrent and imports it into Audiobookshelf – matched, with chapters and a "Requested by" tag. Users sign in with their Audiobookshelf accounts.&#xD;
+&#xD;
+Setup: open the WebUI, enter your Audiobookshelf address and sign in with an Audiobookshelf admin account. Then add download clients and indexers under Settings. The Media path must be the share your download client writes to and Audiobookshelf reads from, so imports are a move or hardlink instead of a copy.</Overview>
+  <Changes>See https://github.com/BlugDeg/Spokarr/blob/main/CHANGELOG.md</Changes>
+  <Category>Downloaders: MediaApp:Books Tools:</Category>
+  <WebUI>http://[IP]:[PORT:5057]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/BlugDeg/Spokarr/main/unraid/spokarr.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/BlugDeg/Spokarr/main/public/icon-512.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>Audiobookshelf 2.26 or newer, SABnzbd and/or qBittorrent, Prowlarr or a Newznab indexer.</Requires>
+  <Config Name="WebUI Port" Target="5057" Default="5057" Mode="tcp" Description="Port of the web interface" Type="Port" Display="always" Required="true" Mask="false">5057</Config>
+  <Config Name="AppData" Target="/data" Default="/mnt/user/appdata/spokarr" Mode="rw" Description="Settings, users and requests" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spokarr</Config>
+  <Config Name="Media" Target="/media" Default="/mnt/user/data" Mode="rw" Description="Share with your downloads and your audiobook library (same share for moves and hardlinks)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data</Config>
+  <Config Name="Library folder" Target="LIBRARY_DIR" Default="/media/media/audiobooks" Mode="" Description="Where Spokarr puts finished audiobooks, as seen inside the container (below /media). Must be the folder of your Audiobookshelf library." Type="Variable" Display="always" Required="true" Mask="false">/media/media/audiobooks</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID to run as" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID to run as" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

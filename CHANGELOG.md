@@ -3,6 +3,16 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] – 2026-11-24
+
+### Added
+- `PUID`/`PGID` like linuxserver.io images (default 1000/1000). The container starts as root only to
+  hand the data folder to that user, then drops root.
+- Unraid template (`unraid/spokarr.xml`).
+
+### Fixed
+- A data folder created by Docker (owned by root) could not be written, so settings were not saved.
+
 ## [0.4.1] – 2026-11-24
 
 ### Added
@@ -58,6 +68,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - First public version: Audible catalog, Newznab search with release scoring, SABnzbd, import into
   Audiobookshelf, English and German interface.
 
+[0.4.2]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.2
 [0.4.1]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.1
 [0.4.0]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.0
 [0.3.0]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.3.0
