@@ -10,9 +10,9 @@ export const stopRequests = () => clearTimeout(timer);
 const FILTERS = {
   all: () => true,
   pending: (r) => r.status === 'pending',
-  active: (r) => ['downloading', 'processing'].includes(r.status),
+  active: (r) => ['downloading', 'processing'].includes(r.status) && !r.stalled,
   available: (r) => r.status === 'available',
-  problems: (r) => ['not_found', 'failed', 'declined'].includes(r.status),
+  problems: (r) => ['not_found', 'failed', 'declined'].includes(r.status) || r.stalled,
   mine: (r) => r.requestedBy?.id === session.user.id,
 };
 
@@ -40,7 +40,8 @@ export async function pageRequests(quiet = false) {
   v.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', () => busy(b, async () => {
     try {
       const r = await post(`/api/requests/${b.dataset.approve}/approve`);
-      toast(r.status === 'downloading' ? t('toast.approved') : (msgText(r.message) || t('toast.noMatch')), r.status === 'downloading' ? 'ok' : 'err');
+      const ok = r.status === 'downloading' && !r.stalled;
+      toast(ok ? t('toast.approved') : (msgText(r.message) || t('toast.noMatch')), ok ? 'ok' : 'err');
     } catch (e) { toast(errText(e), 'err'); }
     pageRequests(true);
   })));
@@ -60,7 +61,7 @@ function item(r, manager) {
     actions.push(`<button class="btn btn-sm btn-green" data-approve="${r.id}">${icon.check}${esc(t('book.approve'))}</button>`);
     actions.push(`<button class="btn btn-sm btn-ghost" data-decline="${r.id}">${icon.x}${esc(t('book.decline'))}</button>`);
   }
-  if (manager && ['not_found', 'failed'].includes(r.status)) {
+  if (manager && (['not_found', 'failed'].includes(r.status) || r.stalled)) {
     actions.push(`<button class="btn btn-sm btn-ghost" data-approve="${r.id}">${icon.refresh}${esc(t('req.retry'))}</button>`);
   }
   const mayDelete = manager || (r.requestedBy?.id === session.user.id && !['downloading', 'processing'].includes(r.status));
@@ -81,7 +82,7 @@ function item(r, manager) {
         </div>
       </div>
       <div class="side">
-        ${badge({ state: r.status, progress: r.progress })}
+        ${r.stalled ? `<span class="badge b-stalled">${icon.warn}${esc(t('status.stalled'))}</span>` : badge({ state: r.status, progress: r.progress })}
         <div class="side-actions">${actions.join('')}</div>
       </div>
     </div>`;

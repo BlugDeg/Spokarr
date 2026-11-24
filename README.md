@@ -59,6 +59,11 @@ set up for them.
 - 🔌 **Prowlarr, SABnzbd and qBittorrent**: search all your Prowlarr indexers at once or add Newznab
   indexers directly; usenet releases go to SABnzbd, torrents to qBittorrent. Torrents keep seeding –
   Spokarr hardlinks (or copies) the files into the library.
+- 🔔 **Notifications** via Discord and ntfy: new requests waiting for approval, approvals, books ready to
+  listen to, declined requests and problems – in English or German, with cover and a link to the book.
+- 🐌 **Stalled downloads** are detected (no progress for a configurable time) and reported. “Search again”
+  picks another release and removes the stalled one from the download client – only if a better release
+  was found.
 - ⚙️ **Settings in the browser**: Audible store, discover rows, Audiobookshelf, download clients, Prowlarr
   and indexers – each with a connection test, plus path mapping when a client sees the disk differently.
 - 🪶 **Lightweight**: plain Node.js without dependencies and JSON files instead of a database – runs fine
@@ -71,8 +76,8 @@ set up for them.
 | ![Book details with approval](docs/screenshots/book.png) | ![Requests with filters](docs/screenshots/requests.png) |
 | **Users** | **Prowlarr and indexers** |
 | ![User management](docs/screenshots/users.png) | ![Indexer settings](docs/screenshots/settings.png) |
-| **Download clients** | |
-| ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) | |
+| **Download clients** | **Notifications** |
+| ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) | ![Discord and ntfy notifications](docs/screenshots/settings-notifications.png) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-discover.png" width="240" alt="Discover on a phone">

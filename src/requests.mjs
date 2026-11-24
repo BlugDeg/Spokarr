@@ -5,7 +5,8 @@ import path from 'node:path';
 import { absAddTags, absEnabled, absItems, absMatch, absScan } from './abs.mjs';
 import { getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
-import { clientStatus, startClientDownload } from './downloads.mjs';
+import { clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
+import { notify } from './notify.mjs';
 import { LIBRARY_DIR, save, state } from './store.mjs';
 import { cleanTitle, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
 
@@ -19,7 +20,7 @@ export function publicRequest(r) {
   const a = state.users.find((x) => x.id === r.decidedBy);
   return {
     id: r.id, asin: r.asin, status: r.status, progress: r.progress || 0, eta: r.eta || '',
-    message: r.message || null, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    message: r.message || null, createdAt: r.createdAt, updatedAt: r.updatedAt, stalled: !!r.stalled,
     release: r.release ? { title: r.release.title, size: r.release.size, indexer: r.release.indexer, protocol: r.release.protocol || 'usenet' } : null,
     book: r.book, absId: r.absId || null,
     requestedBy: u ? { id: u.id, username: u.username } : null,
@@ -46,12 +47,18 @@ export async function statusResolver() {
 async function startDownload(req, guid) {
   const releases = await findReleases(req.book);
   const rel = guid ? releases.find((r) => r.guid === guid) : releases.find((r) => r.ok);
-  Object.assign(req, { progress: 0, message: null, release: null, nzo: null, download: null, misses: 0, eta: '', updatedAt: new Date().toISOString() });
+  const running = req.status === 'downloading' && req.download;
   if (!rel) {
+    // a running (e.g. stalled) download is kept when there is nothing better
+    if (running) { req.message = releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found'); return; }
+    Object.assign(req, { progress: 0, release: null, nzo: null, download: null, eta: '', stalled: false, updatedAt: new Date().toISOString() });
     req.status = 'not_found';
     req.message = releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found');
     return;
   }
+  // replacing a stalled or running download: remove the old one from its client first
+  if (running) await removeClientDownload(req.download).catch((e) => log('Removing old download failed:', e.message));
+  Object.assign(req, { progress: 0, message: null, release: null, nzo: null, download: null, misses: 0, eta: '', stalled: false, lastProgress: 0, progressAt: Date.now(), updatedAt: new Date().toISOString() });
   req.download = await startClientDownload(req, rel);
   req.release = { title: rel.title, size: rel.size, guid: rel.guid, indexer: rel.indexer, protocol: rel.protocol || 'usenet' };
   req.status = 'downloading';
@@ -74,8 +81,10 @@ export async function createRequest(user, asin) {
   if (auto) {
     req.decidedBy = user.id;
     await startDownload(req);
+    if (req.status === 'not_found') notify('failed', req, { reasonKey: 'not_found' });
   } else {
     req.status = 'pending';
+    notify('pending', req);
   }
   await save.requests();
   return req;
@@ -85,9 +94,12 @@ export async function createRequest(user, asin) {
 export async function approveRequest(admin, id, guid) {
   const req = state.requests.find((r) => r.id === id);
   if (!req) throw new UserError('not_found', {}, 404);
-  if (ACTIVE.includes(req.status) && !guid) throw new UserError('already_requested', {}, 409);
+  if (ACTIVE.includes(req.status) && !guid && !req.stalled) throw new UserError('already_requested', {}, 409);
+  const wasPending = req.status === 'pending';
   req.decidedBy = admin.id;
   await startDownload(req, guid);
+  if (req.status === 'downloading' && wasPending) notify('approved', req);
+  if (req.status === 'not_found') notify('failed', req, { reasonKey: 'not_found' });
   await save.requests();
   return req;
 }
@@ -104,6 +116,7 @@ export async function declineRequest(admin, id) {
   const req = state.requests.find((r) => r.id === id);
   if (!req) throw new UserError('not_found', {}, 404);
   Object.assign(req, { status: 'declined', decidedBy: admin.id, updatedAt: new Date().toISOString() });
+  notify('declined', req);
   await save.requests();
   return req;
 }
@@ -196,21 +209,40 @@ export async function poll() {
       let st;
       try { st = await clientStatus(req.download); } catch (e) { log('Download status failed:', req.book.title, e.message); continue; }
       if (st.state === 'downloading') {
+        const now = Date.now();
         req.progress = st.progress || 0;
         req.eta = st.eta || '';
         req.misses = 0;
-        req.message = st.paused ? msg('paused') : st.message ? msg('sab_status', { status: st.message }) : null;
+        // stall detection: no progress for the configured hours while the client is actually trying
+        if (!req.progressAt || st.paused || st.queued || req.progress > (req.lastProgress ?? -1)) {
+          req.lastProgress = req.progress;
+          req.progressAt = now;
+          req.stalled = false;
+        }
+        const hours = Number(state.settings.general.stallHours) || 6;
+        if (!req.stalled && now - req.progressAt > hours * 3600e3) {
+          req.stalled = true;
+          notify('stalled', req, { hours });
+          log('Download stalled', req.book.title);
+        }
+        req.message = req.stalled ? msg('stalled', { hours })
+          : st.paused ? msg('paused') : st.message ? msg('sab_status', { status: st.message }) : null;
         continue;
       }
       if (st.state === 'missing') {
         // a torrent added by URL takes a moment to show up; give up after about five minutes
         req.misses = (req.misses || 0) + 1;
-        if (req.misses > 20) { req.status = 'failed'; req.message = msg('download_failed', { error: 'not found in download client' }); }
+        if (req.misses > 20) {
+          req.status = 'failed';
+          req.message = msg('download_failed', { error: 'not found in download client' });
+          notify('failed', req, { reasonKey: 'download_failed', detail: 'not found in download client' });
+        }
         continue;
       }
       if (st.state === 'failed') {
         req.status = 'failed';
         req.message = msg('download_failed', { error: st.message || '' });
+        notify('failed', req, { reasonKey: 'download_failed', detail: st.message || '' });
       } else if (st.state === 'done') {
         req.status = 'processing';
         req.progress = 100;
@@ -220,9 +252,11 @@ export async function poll() {
           const ok = await linkInAbs(req);
           req.status = 'available';
           req.message = ok ? null : msg('not_scanned_yet');
+          notify('available', req);
         } catch (e) {
           req.status = 'failed';
           req.message = msg('import_failed', { error: e.message });
+          notify('failed', req, { reasonKey: 'import_failed', detail: e.message });
           log('Import failed', req.book.title, e);
         }
       }

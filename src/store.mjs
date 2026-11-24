@@ -39,6 +39,13 @@ function settingsFromEnv() {
       discoverRows: rows,
       defaultPermissions: { ...DEFAULT_PERMISSIONS },
       tagRequester: true,
+      appUrl: trimUrl(env.APP_URL),
+      notifyLanguage: (env.AUDIBLE_REGION || '').toLowerCase() === 'de' ? 'de' : 'en',
+      stallHours: 6,
+    },
+    notifications: {
+      discord: { enabled: false, webhook: '', events: ['pending', 'available', 'failed', 'stalled'] },
+      ntfy: { enabled: false, server: 'https://ntfy.sh', topic: '', token: '', events: ['pending', 'available', 'failed', 'stalled'] },
     },
     abs: {
       url: trimUrl(env.ABS_URL),
@@ -95,6 +102,10 @@ export async function loadState() {
       sab: { ...seed.sab, ...stored.sab },
       qbit: { ...seed.qbit, ...stored.qbit },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
+      notifications: {
+        discord: { ...seed.notifications.discord, ...stored.notifications?.discord },
+        ntfy: { ...seed.notifications.ntfy, ...stored.notifications?.ntfy },
+      },
     }
     : seed;
   if (!stored) { await save.settings(); log('Created settings.json from environment variables'); }

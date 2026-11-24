@@ -1,6 +1,6 @@
 // Picks the download client for a release and wraps their status
-import { qbitEnabled, qbitStatus, sendToQbit } from './qbit.mjs';
-import { sabEnabled, sabStatus, sendToSab } from './sab.mjs';
+import { qbitEnabled, qbitRemove, qbitStatus, sendToQbit } from './qbit.mjs';
+import { sabEnabled, sabRemove, sabStatus, sendToSab } from './sab.mjs';
 import { state } from './store.mjs';
 import { UserError } from './util.mjs';
 
@@ -30,4 +30,10 @@ export function mapPath(client, p) {
   const to = (conf.pathTo || '').replace(/\/+$/, '');
   if (!from || !to || !p) return p;
   return p === from || p.startsWith(from + '/') ? to + p.slice(from.length) : p;
+}
+
+export async function removeClientDownload(download) {
+  if (!download) return;
+  if (download.client === 'qbit') await qbitRemove(download.ref);
+  else await sabRemove(download.ref);
 }

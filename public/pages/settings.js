@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { api, busy, errText, esc, icon, languageName, post, put, toast, view } from '../lib.js';
 import { session } from '../session.js';
 
-const TABS = ['general', 'abs', 'downloads', 'indexers', 'about'];
+const TABS = ['general', 'abs', 'downloads', 'indexers', 'notifications', 'about'];
 const REGION_NAMES = { us: 'audible.com (US)', uk: 'audible.co.uk', ca: 'audible.ca', au: 'audible.com.au', in: 'audible.in', de: 'audible.de', fr: 'audible.fr', it: 'audible.it', es: 'audible.es', jp: 'audible.co.jp' };
 const LANGS = ['english', 'german', 'french', 'italian', 'spanish', 'japanese'];
 let data = null;
@@ -17,8 +17,8 @@ export async function pageSettings(tab = 'general') {
   v.innerHTML = `
     <h1 class="page-title">${esc(t('settings.title'))}</h1>
     <nav class="tabs">${TABS.map((k) => `<a href="#/settings/${k}" class="${k === tab ? 'on' : ''}">${esc(t('settings.' + k))}</a>`).join('')}</nav>
-    <div class="settings-body">${({ general, abs, downloads, indexers, about })[tab]()}</div>`;
-  ({ general: bindGeneral, abs: bindAbs, downloads: bindDownloads, indexers: bindIndexers, about: () => {} })[tab]();
+    <div class="settings-body">${({ general, abs, downloads, indexers, notifications, about })[tab]()}</div>`;
+  ({ general: bindGeneral, abs: bindAbs, downloads: bindDownloads, indexers: bindIndexers, notifications: bindNotifications, about: () => {} })[tab]();
 }
 
 // ---------- building blocks ----------
@@ -54,6 +54,9 @@ function general() {
       ${toggle('autoApprove', g.defaultPermissions.autoApprove, t('perm.autoApprove'), t('perm.autoApproveHint'))}
       ${toggle('manageRequests', g.defaultPermissions.manageRequests, t('perm.manageRequests'), t('perm.manageRequestsHint'))}`, t('settings.defaultsHint'))}
     ${section(t('settings.abs'), toggle('tagRequester', g.tagRequester, t('settings.tagRequester'), t('settings.tagRequesterHint')))}
+    ${section(t('settings.app'), `
+      ${field(t('settings.appUrl'), text('appUrl', g.appUrl, 'type="url" placeholder="https://spokarr.example.com"'), t('settings.appUrlHint'))}
+      ${field(t('settings.stallHours'), text('stallHours', g.stallHours ?? 6, 'type="number" min="1" max="168"'), t('settings.stallHoursHint'))}`)}
     ${saveBar()}
   </form>`;
 }
@@ -73,6 +76,7 @@ function bindGeneral() {
       try {
         await save({ general: {
           region: f.region.value, contentLanguage: f.contentLanguage.value, tagRequester: f.tagRequester.checked,
+          appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value),
           discoverRows: [...rows.querySelectorAll('.row-edit')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value]))),
           defaultPermissions: { request: f.request.checked, autoApprove: f.autoApprove.checked, manageRequests: f.manageRequests.checked },
         } });
@@ -256,6 +260,58 @@ function bindIndexers() {
     e.preventDefault();
     busy(f.querySelector('[type=submit]'), async () => {
       try { await save({ prowlarr: readProw(), indexers: [...list.querySelectorAll('.indexer')].map(read) }); pageSettings('indexers'); } catch (err) { toast(errText(err), 'err'); }
+    });
+  });
+}
+
+// ---------- Notifications ----------
+function notifications() {
+  const n = data.notifications;
+  const g = data.general;
+  const events = (agent) => `<fieldset class="field events"><span>${esc(t('settings.events'))}</span>
+    ${data.events.map((e) => `<label class="toggle"><input type="checkbox" data-event="${e}" ${agent.events.includes(e) ? 'checked' : ''}><span class="switch"></span><span><b>${esc(t('event.' + e))}</b><small>${esc(t('event.' + e + 'Hint'))}</small></span></label>`).join('')}
+  </fieldset>`;
+  return `<form id="f">
+    ${section(t('settings.notifyLanguage'), field(t('settings.notifyLanguage'), `<select name="notifyLanguage"><option value="en" ${g.notifyLanguage !== 'de' ? 'selected' : ''}>English</option><option value="de" ${g.notifyLanguage === 'de' ? 'selected' : ''}>Deutsch</option></select>`, t('settings.notifyLanguageHint')))}
+    <section class="panel settings-section agent" data-agent="discord">
+      <div class="indexer-head"><h2>Discord</h2>${toggle('enabled', n.discord.enabled, t('settings.indexerEnabled'))}</div>
+      ${field(t('settings.webhook'), `<input name="webhook" type="password" autocomplete="off" placeholder="${esc(n.discord.hasWebhook ? t('settings.keyStored') : 'https://discord.com/api/webhooks/…')}">`, t('settings.webhookHint'))}
+      ${events(n.discord)}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.sendTest'))}</button></div>
+    </section>
+    <section class="panel settings-section agent" data-agent="ntfy">
+      <div class="indexer-head"><h2>ntfy</h2>${toggle('enabled', n.ntfy.enabled, t('settings.indexerEnabled'))}</div>
+      <div class="grid-2">
+        ${field(t('settings.ntfyServer'), text('server', n.ntfy.server, 'type="url" placeholder="https://ntfy.sh"'))}
+        ${field(t('settings.ntfyTopic'), text('topic', n.ntfy.topic, 'placeholder="spokarr-…"'))}
+      </div>
+      ${field(t('settings.ntfyToken'), `<input name="token" type="password" autocomplete="off" placeholder="${esc(n.ntfy.hasToken ? t('settings.keyStored') : '')}">`, t('settings.ntfyHint'))}
+      ${events(n.ntfy)}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.sendTest'))}</button></div>
+    </section>
+    ${saveBar()}
+  </form>`;
+}
+function bindNotifications() {
+  const f = document.getElementById('f');
+  const read = (sec) => ({
+    enabled: sec.querySelector('[name=enabled]').checked,
+    ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.name, i.value])),
+    events: [...sec.querySelectorAll('[data-event]')].filter((i) => i.checked).map((i) => i.dataset.event),
+  });
+  f.querySelectorAll('[data-agent]').forEach((sec) => sec.querySelector('[data-test]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    const out = sec.querySelector('[data-result]');
+    try {
+      await post(`/api/settings/test/notify/${sec.dataset.agent}`, read(sec));
+      out.className = 'test-result ok'; out.innerHTML = icon.check + esc(t('settings.testSent'));
+    } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
+  })));
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const body = { general: { notifyLanguage: f.notifyLanguage.value }, notifications: {} };
+    f.querySelectorAll('[data-agent]').forEach((sec) => { body.notifications[sec.dataset.agent] = read(sec); });
+    busy(f.querySelector('[type=submit]'), async () => {
+      try { await save(body); pageSettings('notifications'); } catch (err) { toast(errText(err), 'err'); }
     });
   });
 }

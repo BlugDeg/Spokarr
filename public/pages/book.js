@@ -38,6 +38,8 @@ function actionButtons(b) {
     out.push(url
       ? `<a class="btn btn-green" href="${esc(url)}${b.status.absId ? '/item/' + b.status.absId : ''}" target="_blank" rel="noopener">${icon.play}${esc(t('book.listen'))}</a>`
       : `<button class="btn btn-green" disabled>${icon.check}${esc(t('status.available'))}</button>`);
+  } else if (st === 'downloading' && req?.stalled && can('manageRequests') && req.id) {
+    out.push(`<button class="btn btn-primary" data-approve="${req.id}">${icon.refresh}${esc(t('req.retry'))}</button>`);
   } else if (st === 'downloading' || st === 'processing') {
     out.push(`<button class="btn btn-primary" disabled>${icon.down}${esc(t(st === 'downloading' ? 'book.downloadingBtn' : 'book.importingBtn'))}</button>`);
   } else if (st === 'pending') {
@@ -126,7 +128,8 @@ function render(b) {
   v.querySelector('[data-approve]')?.addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try {
       const r = await post(`/api/requests/${e.currentTarget.dataset.approve}/approve`);
-      toast(r.status === 'downloading' ? t('toast.approved') : (msgText(r.message) || t('toast.noMatch')), r.status === 'downloading' ? 'ok' : 'err');
+      const ok = r.status === 'downloading' && !r.stalled;
+      toast(ok ? t('toast.approved') : (msgText(r.message) || t('toast.noMatch')), ok ? 'ok' : 'err');
     } catch (err) { toast(errText(err), 'err'); }
     refresh(b.asin);
   }));

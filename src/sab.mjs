@@ -6,7 +6,8 @@ export const sabEnabled = (conf = state.settings.sab) => conf.enabled !== false 
 
 export async function sab(params, conf = state.settings.sab) {
   if (!conf.url || !conf.apiKey) throw new UserError('sab_not_configured');
-  const u = new URL('/api', trimUrl(conf.url) + '/');
+  // relative 'api' keeps a URL base such as http://host/sabnzbd
+  const u = new URL('api', trimUrl(conf.url) + '/');
   for (const [k, v] of Object.entries({ ...params, apikey: conf.apiKey, output: 'json' })) u.searchParams.set(k, v);
   const d = await fetchJson(u, {}, 15000).catch(() => { throw new UserError('sab_unreachable', { url: conf.url }); });
   if (d.status === false && /api key/i.test(d.error || '')) throw new UserError('sab_bad_key');
@@ -32,11 +33,17 @@ export async function sendToSab(book, rel) {
 export async function sabStatus(nzo) {
   const q = await sab({ mode: 'queue', limit: 200 });
   const s = (q.queue?.slots || []).find((x) => x.nzo_id === nzo);
-  if (s) return { state: 'downloading', progress: Number(s.percentage) || 0, eta: s.timeleft || '', paused: s.status === 'Paused' };
+  if (s) return { state: 'downloading', progress: Number(s.percentage) || 0, eta: s.timeleft || '', paused: s.status === 'Paused', queued: s.status === 'Queued' };
   const h = await sab({ mode: 'history', nzo_ids: nzo });
   const slot = h.history?.slots?.[0];
   if (!slot) return { state: 'missing' };
   if (slot.status === 'Completed') return { state: 'done', path: slot.storage };
   if (slot.status === 'Failed') return { state: 'failed', message: slot.fail_message || '' };
   return { state: 'downloading', progress: 100, eta: '', message: slot.status };
+}
+
+/** Removes a job from the queue (or history) including its files – used when retrying a stalled download. */
+export async function sabRemove(nzo) {
+  await sab({ mode: 'queue', name: 'delete', value: nzo, del_files: 1 }).catch(() => {});
+  await sab({ mode: 'history', name: 'delete', value: nzo, del_files: 1 }).catch(() => {});
 }

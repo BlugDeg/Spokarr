@@ -379,3 +379,7 @@ details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
 .proto { font-weight: 700; border-radius: 6px; padding: 0 6px; }
 .proto-usenet { background: rgba(99,102,241,.18); color: #c7d2fe; }
 .proto-torrent { background: rgba(16,185,129,.18); color: #6ee7b7; }
+
+/* v0.4: notifications, stalled */
+.b-stalled { background: #f97316; color: #2a1200; }
+.events { margin-top: 6px; }

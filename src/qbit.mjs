@@ -90,5 +90,15 @@ export async function qbitStatus(tag) {
     progress: Math.round(p * 1000) / 10,
     eta: t.eta > 0 && t.eta < 8640000 ? fmtEta(t.eta) : '',
     paused: /paused|stopped/i.test(t.state),
+    queued: /queued/i.test(t.state),
   };
+}
+
+/** Removes the torrent and its files – used when retrying a stalled download. */
+export async function qbitRemove(tag) {
+  const list = await qbit('torrents/info', { query: { tag } }).catch(() => []);
+  const hashes = (Array.isArray(list) ? list : []).filter((x) => String(x.tags || '').split(',').map((s) => s.trim()).includes(tag)).map((x) => x.hash);
+  if (!hashes.length) return;
+  const form = new URLSearchParams({ hashes: hashes.join('|'), deleteFiles: 'true' });
+  await qbit('torrents/delete', { method: 'POST', form }).catch(() => {});
 }

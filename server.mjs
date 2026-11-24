@@ -11,6 +11,7 @@ import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
   ACTIVE, approveRequest, createRequest, declineRequest, poll, publicRequest, requestWithRelease, statusResolver,
 } from './src/requests.mjs';
+import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
@@ -30,6 +31,9 @@ const mask = (s) => {
   for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
   out.qbit.hasPassword = !!out.qbit.password;
   out.qbit.password = '';
+  const n = out.notifications;
+  n.discord.hasWebhook = !!n.discord.webhook; n.discord.webhook = '';
+  n.ntfy.hasToken = !!n.ntfy.token; n.ntfy.token = '';
   out.indexers = (out.indexers || []).map((i) => ({ ...i, hasApiKey: !!i.apiKey, apiKey: '' }));
   out.libraryDir = LIBRARY_DIR;
   return out;
@@ -59,6 +63,9 @@ function applySettings(body) {
       };
     }
     if (g.tagRequester !== undefined) s.general.tagRequester = bool(g.tagRequester);
+    if (g.appUrl !== undefined) s.general.appUrl = trimUrl(g.appUrl);
+    if (g.notifyLanguage !== undefined) s.general.notifyLanguage = g.notifyLanguage === 'de' ? 'de' : 'en';
+    if (g.stallHours !== undefined) s.general.stallHours = Math.min(168, Math.max(1, Number(g.stallHours) || 6));
   }
   if (body.abs) {
     const a = body.abs;
@@ -112,6 +119,28 @@ function applySettings(body) {
       categories: String(i.categories || '3030').replace(/[^0-9,]/g, ''),
       enabled: i.enabled !== false,
     }));
+  }
+  if (body.notifications) {
+    const n = body.notifications;
+    const events = (v, old) => (Array.isArray(v) ? v.filter((e) => EVENTS.includes(e)) : old);
+    if (n.discord) {
+      const o = s.notifications.discord;
+      s.notifications.discord = {
+        enabled: n.discord.enabled !== undefined ? bool(n.discord.enabled) : o.enabled,
+        webhook: keepKey(n.discord.webhook, o.webhook),
+        events: events(n.discord.events, o.events),
+      };
+    }
+    if (n.ntfy) {
+      const o = s.notifications.ntfy;
+      s.notifications.ntfy = {
+        enabled: n.ntfy.enabled !== undefined ? bool(n.ntfy.enabled) : o.enabled,
+        server: n.ntfy.server !== undefined ? trimUrl(n.ntfy.server) || 'https://ntfy.sh' : o.server,
+        topic: str(n.ntfy.topic, o.topic),
+        token: keepKey(n.ntfy.token, o.token),
+        events: events(n.ntfy.events, o.events),
+      };
+    }
   }
   uncache('discover:');
   uncache('abs:');
@@ -247,11 +276,11 @@ route('POST', '/api/users/import', ADMIN, async () => {
 });
 
 // ---------- Settings ----------
-route('GET', '/api/settings', ADMIN, () => ({ ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage() }));
+route('GET', '/api/settings', ADMIN, () => ({ ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS }));
 route('PUT', '/api/settings', ADMIN, async ({ body }) => {
   applySettings(body);
   await save.settings();
-  return { ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage() };
+  return { ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS };
 });
 route('POST', '/api/settings/test/abs', ADMIN, async ({ body }) => {
   const url = trimUrl(body.url ?? state.settings.abs.url);
@@ -274,6 +303,12 @@ route('POST', '/api/settings/test/prowlarr', ADMIN, async ({ body }) => testProw
   url: trimUrl(body.url ?? state.settings.prowlarr.url),
   apiKey: keepKey(body.apiKey, state.settings.prowlarr.apiKey),
 }));
+route('POST', /^\/api\/settings\/test\/notify\/(discord|ntfy)$/, ADMIN, async ({ m, body }) => {
+  const stored = state.settings.notifications[m[1]];
+  return testNotify(m[1], m[1] === 'discord'
+    ? { webhook: keepKey(body.webhook, stored.webhook) }
+    : { server: body.server || stored.server, topic: body.topic ?? stored.topic, token: keepKey(body.token, stored.token) });
+});
 route('POST', '/api/settings/test/indexer', ADMIN, async ({ body }) => {
   const stored = (state.settings.indexers || []).find((i) => i.id === body.id);
   return testIndexer({ name: body.name || 'Indexer', url: body.url, apiKey: keepKey(body.apiKey, stored?.apiKey || ''), categories: body.categories });
