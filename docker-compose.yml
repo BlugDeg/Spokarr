@@ -5,7 +5,7 @@ services:
     build: .
     container_name: spokarr
     restart: unless-stopped
-    env_file: .env
+    # env_file: .env   # optional, only used to pre-fill settings on the first start
     ports:
       - "5057:5057"
     volumes:

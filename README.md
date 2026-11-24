@@ -23,14 +23,21 @@ for a release that matches it.
 - **Clean import**: finished downloads are moved to `Author/Title`, get a `metadata.json` and cover,
   and Audiobookshelf is told to scan and match the book against Audible.
 - **Library status**: books you already own show as *Available*, running downloads with progress.
+- **Audiobookshelf accounts**: everyone signs in with their Audiobookshelf username and password – no
+  separate accounts, no stored passwords. Imported books are tagged “Requested by <name>” in
+  Audiobookshelf, so people find their requests there too.
+- **Users and permissions**: request, auto-approve and manage requests per user; requests from users
+  without auto-approve wait for an admin.
+- **Settings in the browser**: Audible store, discover rows, Audiobookshelf, SABnzbd and any number of
+  indexers, each with a connection test.
 - **Mobile first**, installable as a home-screen app, English and German interface.
-- No database, no dependencies – a single Node.js file and a static web app.
+- No database, no dependencies – plain Node.js and a static web app.
 
 ## Requirements
 
 - A Newznab-compatible indexer with an audiobook category
 - SABnzbd
-- Audiobookshelf (optional, but recommended)
+- Audiobookshelf 2.26 or newer (used for sign-in)
 - Docker, or Node.js 20+
 
 ## Quick start (Docker)
@@ -38,24 +45,32 @@ for a release that matches it.
 ```bash
 git clone https://github.com/<you>/spokarr.git
 cd spokarr
-cp .env.example .env      # fill in your indexer, SABnzbd and Audiobookshelf details
 docker compose up -d --build
 ```
 
-Open `http://<host>:5057`.
+Open `http://<host>:5057` and follow the setup:
 
-In SABnzbd, create the category set in `SAB_CATEGORY` (default `spokarr`). SABnzbd's download folder and
-`LIBRARY_DIR` should be on the same disk so imports are an instant move.
+1. Enter the address of your Audiobookshelf server.
+2. Sign in with an Audiobookshelf **administrator** account. You become the owner of Spokarr, and
+   Spokarr creates its own API key in Audiobookshelf.
+3. Under **Settings**, add SABnzbd and your indexers and pick the Audiobookshelf library.
+
+In SABnzbd, create the category Spokarr uses (default `spokarr`). SABnzbd's download folder and the
+library folder should be on the same disk so imports are an instant move.
+
+Other Audiobookshelf users can sign in right away, or an admin imports them all under **Users**.
 
 ## Configuration
 
-All settings are environment variables – see [`.env.example`](.env.example) for the full list.
+Everything is configured in the web interface and stored in `data/settings.json`. Environment
+variables (see [`.env.example`](.env.example)) are only read on the very first start, which is handy for
+automated deployments.
 
 | Variable | Description |
 |---|---|
 | `AUDIBLE_REGION` | Audible store for the catalog: `us`, `uk`, `ca`, `au`, `in`, `de`, `fr`, `it`, `es`, `jp` |
 | `CONTENT_LANGUAGE` | Language shown on the discover page (defaults to the region's language) |
-| `LIBRARY_DIR` | Where finished audiobooks are placed |
+| `LIBRARY_DIR` | Where finished audiobooks are placed (inside the container) – the only setting not editable in the UI |
 | `NEWZNAB_URL`, `NEWZNAB_API_KEY`, `NEWZNAB_CATEGORIES` | Your indexer |
 | `SAB_URL`, `SAB_API_KEY`, `SAB_CATEGORY` | SABnzbd |
 | `ABS_URL`, `ABS_API_KEY`, `ABS_PUBLIC_URL`, `ABS_LIBRARY_ID`, `ABS_LIBRARY_MOUNT` | Audiobookshelf |

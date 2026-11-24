@@ -4,6 +4,7 @@ LABEL org.opencontainers.image.title="Spokarr" \
       org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 COPY package.json server.mjs ./
+COPY src ./src
 COPY public ./public
 ENV NODE_ENV=production PORT=5057 DATA_DIR=/data LIBRARY_DIR=/audiobooks
 EXPOSE 5057
