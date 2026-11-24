@@ -3,6 +3,13 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] – 2026-11-24
+
+### Fixed
+- Import failed with `EXDEV` when downloads and library are on different mounts (e.g. two NFS exports).
+  Spokarr now copies and removes the source; a source that cannot be removed (e.g. `.fuse_hidden` files
+  on Unraid/NFS) only logs a warning. Thanks @TheLord83 (#4)
+
 ## [0.5.0] – 2026-11-24
 
 ### Added
@@ -75,6 +82,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - First public version: Audible catalog, Newznab search with release scoring, SABnzbd, import into
   Audiobookshelf, English and German interface.
 
+[0.5.1]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.5.1
 [0.5.0]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.5.0
 [0.4.2]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.2
 [0.4.1]: https://github.com/BlugDeg/Spokarr/releases/tag/v0.4.1
