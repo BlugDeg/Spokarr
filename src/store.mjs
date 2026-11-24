@@ -55,10 +55,18 @@ function settingsFromEnv() {
       libraryMount: env.ABS_LIBRARY_MOUNT || LIBRARY_DIR,
     },
     sab: {
-      enabled: true,
+      enabled: !!env.SAB_URL || !env.NZBGET_URL,
       url: trimUrl(env.SAB_URL),
       apiKey: env.SAB_API_KEY || '',
       category: env.SAB_CATEGORY || 'spokarr',
+      pathFrom: '', pathTo: '',
+    },
+    nzbget: {
+      enabled: !!env.NZBGET_URL,
+      url: trimUrl(env.NZBGET_URL),
+      username: env.NZBGET_USERNAME || '',
+      password: env.NZBGET_PASSWORD || '',
+      category: env.NZBGET_CATEGORY || 'spokarr',
       pathFrom: '', pathTo: '',
     },
     qbit: {
@@ -100,6 +108,7 @@ export async function loadState() {
       general: { ...seed.general, ...stored.general },
       abs: { ...seed.abs, ...stored.abs },
       sab: { ...seed.sab, ...stored.sab },
+      nzbget: { ...seed.nzbget, ...stored.nzbget },
       qbit: { ...seed.qbit, ...stored.qbit },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
       notifications: {

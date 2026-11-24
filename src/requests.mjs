@@ -5,7 +5,7 @@ import path from 'node:path';
 import { absAddTags, absEnabled, absImproveChapters, absItems, absMatch, absScan } from './abs.mjs';
 import { getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
-import { clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
+import { CLIENT_NAMES, clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
 import { notify } from './notify.mjs';
 import { LIBRARY_DIR, save, state } from './store.mjs';
 import { cleanTitle, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
@@ -228,7 +228,7 @@ export async function poll() {
           log('Download stalled', req.book.title);
         }
         req.message = req.stalled ? msg('stalled', { hours })
-          : st.paused ? msg('paused') : st.message ? msg('sab_status', { status: st.message }) : null;
+          : st.paused ? msg('paused') : st.message ? msg('client_status', { client: CLIENT_NAMES[req.download?.client] || 'SABnzbd', status: st.message }) : null;
         continue;
       }
       if (st.state === 'missing') {

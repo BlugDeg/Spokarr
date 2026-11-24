@@ -135,6 +135,7 @@ const pathFields = (c) => `
 function downloads() {
   const s = data.sab;
   const q = data.qbit;
+  const n = data.nzbget || {};
   return `<form id="f">
     <section class="panel settings-section client" data-client="sab">
       <div class="indexer-head"><h2>SABnzbd <span class="pill">Usenet</span></h2>${toggle('enabled', s.enabled !== false, t('settings.indexerEnabled'))}</div>
@@ -142,6 +143,18 @@ function downloads() {
       ${field(t('settings.apiKey'), keyInput('apiKey', s.hasApiKey), t('settings.sabKeyHint'))}
       ${field(t('settings.sabCategory'), text('category', s.category, 'placeholder="spokarr"'), t('settings.sabCategoryHint'))}
       ${pathFields(s)}
+      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
+    </section>
+    <section class="panel settings-section client" data-client="nzbget">
+      <div class="indexer-head"><h2>NZBGet <span class="pill">Usenet</span></h2>${toggle('enabled', n.enabled === true, t('settings.indexerEnabled'))}</div>
+      <p class="muted">${esc(t('settings.nzbgetHint'))}</p>
+      ${field(t('settings.nzbgetUrl'), text('url', n.url, 'type="url" placeholder="http://nzbget:6789"'))}
+      <div class="grid-2">
+        ${field(t('login.username'), text('username', n.username, 'autocomplete="off"'))}
+        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(n.hasPassword ? t('settings.keyStored') : '')}">`)}
+      </div>
+      ${field(t('settings.sabCategory'), text('category', n.category, 'placeholder="spokarr"'), t('settings.nzbgetCategoryHint'))}
+      ${pathFields(n)}
       <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
     </section>
     <section class="panel settings-section client" data-client="qbit">
@@ -169,10 +182,10 @@ function bindDownloads() {
     const client = sec.dataset.client;
     try {
       const r = await post(`/api/settings/test/${client}`, read(sec));
-      const name = client === 'sab' ? 'SABnzbd' : 'qBittorrent';
+      const name = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent' }[client];
       const okCat = r.categoryExists;
       out.className = 'test-result ' + (okCat ? 'ok' : 'err');
-      out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}` : t('settings.sabCategoryMissing', { cat: read(sec).category }));
+      out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}` : t('settings.sabCategoryMissing', { cat: read(sec).category, client: name }));
     } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
   })));
   f.addEventListener('submit', (e) => {

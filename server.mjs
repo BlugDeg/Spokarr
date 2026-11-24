@@ -13,6 +13,7 @@ import {
 } from './src/requests.mjs';
 import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
+import { testNzbget } from './src/nzbget.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
 import { cached, log, randomId, trimUrl, uncache, UserError } from './src/util.mjs';
@@ -29,8 +30,7 @@ async function annotate(books) {
 const mask = (s) => {
   const out = structuredClone(s);
   for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
-  out.qbit.hasPassword = !!out.qbit.password;
-  out.qbit.password = '';
+  for (const sec of [out.qbit, out.nzbget]) { sec.hasPassword = !!sec.password; sec.password = ''; }
   const n = out.notifications;
   n.discord.hasWebhook = !!n.discord.webhook; n.discord.webhook = '';
   n.ntfy.hasToken = !!n.ntfy.token; n.ntfy.token = '';
@@ -87,6 +87,17 @@ function applySettings(body) {
       apiKey: keepKey(b.apiKey, s.sab.apiKey),
       category: b.category !== undefined ? String(b.category).trim() || 'spokarr' : s.sab.category,
       pathFrom: str(b.pathFrom, s.sab.pathFrom), pathTo: str(b.pathTo, s.sab.pathTo),
+    };
+  }
+  if (body.nzbget) {
+    const b = body.nzbget;
+    s.nzbget = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.nzbget.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.nzbget.url,
+      username: str(b.username, s.nzbget.username),
+      password: keepKey(b.password, s.nzbget.password),
+      category: str(b.category, s.nzbget.category),
+      pathFrom: str(b.pathFrom, s.nzbget.pathFrom), pathTo: str(b.pathTo, s.nzbget.pathTo),
     };
   }
   if (body.qbit) {
@@ -292,6 +303,12 @@ route('POST', '/api/settings/test/sab', ADMIN, async ({ body }) => testSab({
   url: trimUrl(body.url ?? state.settings.sab.url),
   apiKey: keepKey(body.apiKey, state.settings.sab.apiKey),
   category: body.category ?? state.settings.sab.category,
+}));
+route('POST', '/api/settings/test/nzbget', ADMIN, async ({ body }) => testNzbget({
+  url: trimUrl(body.url ?? state.settings.nzbget.url),
+  username: body.username ?? state.settings.nzbget.username,
+  password: keepKey(body.password, state.settings.nzbget.password),
+  category: body.category ?? state.settings.nzbget.category,
 }));
 route('POST', '/api/settings/test/qbit', ADMIN, async ({ body }) => testQbit({
   url: trimUrl(body.url ?? state.settings.qbit.url),

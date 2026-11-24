@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/BlugDeg/Spokarr/issues</Support>
   <Project>https://github.com/BlugDeg/Spokarr</Project>
-  <Overview>Request audiobooks like you request movies in Seerr. Pick the exact edition from the Audible catalog (narrator, unabridged, language); Spokarr finds a matching release through Prowlarr or Newznab indexers, downloads it with SABnzbd or qBittorrent and imports it into Audiobookshelf – matched, with chapters and a "Requested by" tag. Users sign in with their Audiobookshelf accounts.&#xD;
+  <Overview>Request audiobooks like you request movies in Seerr. Pick the exact edition from the Audible catalog (narrator, unabridged, language); Spokarr finds a matching release through Prowlarr or Newznab indexers, downloads it with SABnzbd, NZBGet or qBittorrent and imports it into Audiobookshelf – matched, with chapters and a "Requested by" tag. Users sign in with their Audiobookshelf accounts.&#xD;
 &#xD;
 Setup: open the WebUI, enter your Audiobookshelf address and sign in with an Audiobookshelf admin account. Then add download clients and indexers under Settings. The Media path must be the share your download client writes to and Audiobookshelf reads from, so imports are a move or hardlink instead of a copy.</Overview>
   <Changes>See https://github.com/BlugDeg/Spokarr/blob/main/CHANGELOG.md</Changes>
@@ -22,7 +22,7 @@ Setup: open the WebUI, enter your Audiobookshelf address and sign in with an Aud
   <CPUset/>
   <DonateText/>
   <DonateLink/>
-  <Requires>Audiobookshelf 2.26 or newer, SABnzbd and/or qBittorrent, Prowlarr or a Newznab indexer.</Requires>
+  <Requires>Audiobookshelf 2.26 or newer, SABnzbd or NZBGet and/or qBittorrent, Prowlarr or a Newznab indexer.</Requires>
   <Config Name="WebUI Port" Target="5057" Default="5057" Mode="tcp" Description="Port of the web interface" Type="Port" Display="always" Required="true" Mask="false">5057</Config>
   <Config Name="AppData" Target="/data" Default="/mnt/user/appdata/spokarr" Mode="rw" Description="Settings, users and requests" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spokarr</Config>
   <Config Name="Media" Target="/media" Default="/mnt/user/data" Mode="rw" Description="Share with your downloads and your audiobook library (same share for moves and hardlinks)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data</Config>
