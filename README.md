@@ -17,23 +17,28 @@
   <img alt="Languages" src="https://img.shields.io/badge/UI-English%20%7C%20Deutsch-6366f1">
 </p>
 
-<p align="center"><img src="docs/screenshots/discover.png" alt="Discover page" width="900"></p>
+<p align="center"><img src="docs/screenshots/demo.gif" alt="Discover, search, request and listen" width="900"></p>
 
 ---
 
-## Why Spokarr?
+## What makes Spokarr different
 
-Readarr is built around *books*. Its metadata rarely knows narrators, editions or non-English titles, so
-getting *the* recording you want – the unabridged one, read by your favourite narrator, in your
-language – is guesswork.
+- **The exact recording, not just the book.** You pick an edition from the Audible catalog – narrator,
+  unabridged or abridged, language – and Spokarr scores every release against it. A full-cast
+  dramatization or an English release won't sneak in when you asked for a German reading.
+- **Built for audiobooks in any language.** Every Audible store works (US, UK, DE, FR, IT, ES, JP, …),
+  release names in other languages are matched properly, umlauts included.
+- **No new accounts.** Everyone signs in with their Audiobookshelf account; requests show up in
+  Audiobookshelf tagged with who asked for them.
+- **Light enough for a Raspberry Pi.** One small Node.js process without dependencies and JSON files
+  instead of a database.
 
-Spokarr starts from the **Audible catalog** instead. You pick the exact edition, Spokarr looks for a
-release that matches it on your indexers (directly or through Prowlarr), sends it to SABnzbd or
-qBittorrent and hands the finished book to Audiobookshelf – already matched, with cover, chapters and
-narrator.
+### Why not Readarr?
 
-Everyone in your household signs in with their **Audiobookshelf account**, so there is nothing new to
-set up for them.
+Readarr is built around *books*. Its metadata rarely knows narrators, editions or non-English titles,
+so getting the recording you want is guesswork. Spokarr starts from the Audible catalog instead, finds a
+matching release on your indexers (directly or through Prowlarr), sends it to SABnzbd or qBittorrent
+and hands the finished book to Audiobookshelf – already matched, with cover, chapters and narrator.
 
 ## Features
 
@@ -71,13 +76,15 @@ set up for them.
 
 ## Screenshots
 
-| Book details | Requests |
+| Discover | Book details |
 |---|---|
-| ![Book details with approval](docs/screenshots/book.png) | ![Requests with filters](docs/screenshots/requests.png) |
-| **Users** | **Prowlarr and indexers** |
-| ![User management](docs/screenshots/users.png) | ![Indexer settings](docs/screenshots/settings.png) |
-| **Download clients** | **Notifications** |
-| ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) | ![Discord and ntfy notifications](docs/screenshots/settings-notifications.png) |
+| ![Discover page](docs/screenshots/discover.png) | ![Book details with approval](docs/screenshots/book.png) |
+| **Requests** | **Users** |
+| ![Requests with filters](docs/screenshots/requests.png) | ![User management](docs/screenshots/users.png) |
+| **Prowlarr and indexers** | **Download clients** |
+| ![Indexer settings](docs/screenshots/settings.png) | ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) |
+| **Notifications** | **Sign in with Audiobookshelf** |
+| ![Discord and ntfy notifications](docs/screenshots/settings-notifications.png) | ![Sign in with your Audiobookshelf account](docs/screenshots/login.png) |
 
 <p align="center">
   <img src="docs/screenshots/mobile-discover.png" width="240" alt="Discover on a phone">
@@ -86,8 +93,6 @@ set up for them.
   &nbsp;
   <img src="docs/screenshots/mobile-requests.png" width="240" alt="Requests on a phone">
 </p>
-
-<p align="center"><img src="docs/screenshots/login.png" alt="Sign in with your Audiobookshelf account" width="620"></p>
 
 ## How it works
 
@@ -227,6 +232,12 @@ A release is picked automatically at 50 points or more. Everything else can be c
 - Failed sign-ins are rate-limited (8 attempts per 15 minutes and IP).
 - API keys are stored in `data/settings.json` with file mode `600` and never sent to the browser.
 - Put Spokarr behind HTTPS (e.g. a reverse proxy) if you expose it to the internet.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome – see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are
+listed in the [changelog](CHANGELOG.md). Please report security problems privately, see
+[SECURITY.md](SECURITY.md).
 
 ## Translating
 

@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please remove API keys, passwords and personal data from logs.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Spokarr version
+      description: Shown at the bottom of the sidebar, e.g. v0.4.0
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation
+      options: [Docker (ghcr.io image), Docker (built myself), Node.js directly, Other]
+    validations:
+      required: true
+  - type: input
+    id: services
+    attributes:
+      label: Connected services and versions
+      description: e.g. Audiobookshelf 2.38, SABnzbd 4.5, qBittorrent 5.0, Prowlarr 1.30
+  - type: input
+    id: region
+    attributes:
+      label: Audible store
+      description: e.g. us, uk, de
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `docker logs spokarr --tail 100` (remove secrets)
+      render: text
