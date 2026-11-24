@@ -61,6 +61,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
   lets you pick a release by hand.
 - 🗂️ **Clean import**: downloads are moved to `Author/Title`, get a `metadata.json` and a cover,
   Audiobookshelf scans and matches the book, and it is tagged “Requested by &lt;name&gt;”.
+- 📑 **Real chapters**: releases with one file per CD track get proper chapters from the files' title
+  tags – or from Audible, when the runtime matches.
 - 🔌 **Prowlarr, SABnzbd and qBittorrent**: search all your Prowlarr indexers at once or add Newznab
   indexers directly; usenet releases go to SABnzbd, torrents to qBittorrent. Torrents keep seeding –
   Spokarr hardlinks (or copies) the files into the library.
