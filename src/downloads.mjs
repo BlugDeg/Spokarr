@@ -3,13 +3,14 @@ import { nzbgetEnabled, nzbgetRemove, nzbgetStatus, sendToNzbget } from './nzbge
 import { qbitEnabled, qbitRemove, qbitStatus, sendToQbit } from './qbit.mjs';
 import { sabEnabled, sabRemove, sabStatus, sendToSab } from './sab.mjs';
 import { state } from './store.mjs';
+import { sendToTransmission, transmissionEnabled, transmissionRemove, transmissionStatus } from './transmission.mjs';
 import { UserError } from './util.mjs';
 
-export const CLIENT_NAMES = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent' };
+export const CLIENT_NAMES = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission' };
 
-/** usenet → SABnzbd (or NZBGet), torrent → qBittorrent */
+/** usenet → SABnzbd (or NZBGet), torrent → qBittorrent (or Transmission) */
 export function clientFor(protocol) {
-  if (protocol === 'torrent') return qbitEnabled() ? 'qbit' : null;
+  if (protocol === 'torrent') return qbitEnabled() ? 'qbit' : transmissionEnabled() ? 'transmission' : null;
   if (sabEnabled()) return 'sab';
   return nzbgetEnabled() ? 'nzbget' : null;
 }
@@ -18,6 +19,7 @@ export async function startClientDownload(req, rel) {
   const client = clientFor(rel.protocol);
   if (!client) throw new UserError('no_client', { protocol: rel.protocol || 'usenet' });
   const ref = client === 'qbit' ? await sendToQbit(req.id, rel)
+    : client === 'transmission' ? await sendToTransmission(req.id, rel)
     : client === 'nzbget' ? await sendToNzbget(req.book, rel)
     : await sendToSab(req.book, rel);
   return { client, ref };
@@ -25,6 +27,7 @@ export async function startClientDownload(req, rel) {
 
 export async function clientStatus(download) {
   const st = download.client === 'qbit' ? await qbitStatus(download.ref)
+    : download.client === 'transmission' ? await transmissionStatus(download.ref)
     : download.client === 'nzbget' ? await nzbgetStatus(download.ref)
     : await sabStatus(download.ref);
   if (st.path) st.path = mapPath(download.client, st.path);
@@ -43,6 +46,7 @@ export function mapPath(client, p) {
 export async function removeClientDownload(download) {
   if (!download) return;
   if (download.client === 'qbit') await qbitRemove(download.ref);
+  else if (download.client === 'transmission') await transmissionRemove(download.ref);
   else if (download.client === 'nzbget') await nzbgetRemove(download.ref);
   else await sabRemove(download.ref);
 }

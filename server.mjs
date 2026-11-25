@@ -13,6 +13,7 @@ import {
 } from './src/requests.mjs';
 import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
+import { testTransmission } from './src/transmission.mjs';
 import { testNzbget } from './src/nzbget.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
@@ -45,7 +46,7 @@ async function annotate(books) {
 const mask = (s) => {
   const out = structuredClone(s);
   for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
-  for (const sec of [out.qbit, out.nzbget]) { sec.hasPassword = !!sec.password; sec.password = ''; }
+  for (const sec of [out.qbit, out.nzbget, out.transmission]) { sec.hasPassword = !!sec.password; sec.password = ''; }
   const n = out.notifications;
   n.discord.hasWebhook = !!n.discord.webhook; n.discord.webhook = '';
   n.ntfy.hasToken = !!n.ntfy.token; n.ntfy.token = '';
@@ -130,6 +131,18 @@ function applySettings(body) {
       password: keepKey(b.password, s.qbit.password),
       category: str(b.category, s.qbit.category),
       pathFrom: str(b.pathFrom, s.qbit.pathFrom), pathTo: str(b.pathTo, s.qbit.pathTo),
+    };
+  }
+  if (body.transmission) {
+    const b = body.transmission;
+    s.transmission = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.transmission.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.transmission.url,
+      username: str(b.username, s.transmission.username),
+      password: keepKey(b.password, s.transmission.password),
+      label: str(b.label, s.transmission.label),
+      downloadDir: str(b.downloadDir, s.transmission.downloadDir),
+      pathFrom: str(b.pathFrom, s.transmission.pathFrom), pathTo: str(b.pathTo, s.transmission.pathTo),
     };
   }
   if (body.prowlarr) {
@@ -349,6 +362,11 @@ route('POST', '/api/settings/test/qbit', ADMIN, async ({ body }) => testQbit({
   username: body.username ?? state.settings.qbit.username,
   password: keepKey(body.password, state.settings.qbit.password),
   category: body.category ?? state.settings.qbit.category,
+}));
+route('POST', '/api/settings/test/transmission', ADMIN, async ({ body }) => testTransmission({
+  url: trimUrl(body.url ?? state.settings.transmission.url),
+  username: body.username ?? state.settings.transmission.username,
+  password: keepKey(body.password, state.settings.transmission.password),
 }));
 route('POST', '/api/settings/test/prowlarr', ADMIN, async ({ body }) => testProwlarr({
   url: trimUrl(body.url ?? state.settings.prowlarr.url),

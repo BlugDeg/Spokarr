@@ -81,6 +81,15 @@ function settingsFromEnv() {
       category: env.QBIT_CATEGORY || 'spokarr',
       pathFrom: '', pathTo: '',
     },
+    transmission: {
+      enabled: !!env.TRANSMISSION_URL,
+      url: trimUrl(env.TRANSMISSION_URL),
+      username: env.TRANSMISSION_USERNAME || '',
+      password: env.TRANSMISSION_PASSWORD || '',
+      label: env.TRANSMISSION_LABEL ?? 'spokarr',
+      downloadDir: env.TRANSMISSION_DOWNLOAD_DIR || '',
+      pathFrom: '', pathTo: '',
+    },
     prowlarr: {
       enabled: !!env.PROWLARR_URL,
       url: trimUrl(env.PROWLARR_URL),
@@ -114,6 +123,7 @@ export async function loadState() {
       sab: { ...seed.sab, ...stored.sab },
       nzbget: { ...seed.nzbget, ...stored.nzbget },
       qbit: { ...seed.qbit, ...stored.qbit },
+      transmission: { ...seed.transmission, ...stored.transmission },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
       notifications: {
         discord: { ...seed.notifications.discord, ...stored.notifications?.discord },

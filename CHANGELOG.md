@@ -3,6 +3,15 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] – 2026-11-25
+
+### Added
+- **Transmission** as a torrent client (RPC; tested with Transmission 4.1.4). Progress, ETA, paused and
+  queued states, local errors, label and download folder, path mapping, removal on retry; torrents keep
+  seeding and are hardlinked into the library. Spokarr resolves indexer links itself, so redirects to
+  magnet links (common with Prowlarr) work. If qBittorrent and Transmission are both enabled,
+  qBittorrent is used.
+
 ## [0.6.0] – 2026-11-25
 
 ### Added
