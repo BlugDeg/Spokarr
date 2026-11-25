@@ -1,5 +1,7 @@
 // Audible catalog (public API, no account needed)
-import { state } from './store.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DATA_DIR, state } from './store.mjs';
 import { cached, fetchJson, log, norm, stripHtml, UserError } from './util.mjs';
 
 export const REGIONS = {
@@ -89,6 +91,157 @@ export async function searchAudible(params, { languageOnly = false } = {}) {
     .filter((p) => !languageOnly || p.language === lang)
     .map(mapProduct);
 }
+const CATEGORY_TTL = 24 * 3600e3;
+const catUrl = (path = '') => new URL(`https://${region().host}/1.0/catalog/categories${path}`);
+
+/** Sort orders. The API only supports BestSellers and AvgRating in a useful way,
+ *  everything else is sorted locally after loading. */
+export const SORTS = {
+  popular: 'BestSellers',
+  hot: 'BestSellers',      // current bestsellers (best of the last 12 months)
+  new: 'BestSellers',      // newest first (last 18 months, by date)
+  old: 'BestSellers',      // oldest first
+  rating: 'AvgRating',     // best rated
+  long: 'BestSellers',     // longest first
+};
+
+/**
+ * Whole category tree of the region as a flat list including the path.
+ * The API only returns the children of a single node, so the tree is built
+ * bottom-up level by level and cached for 24 hours afterwards.
+ */
+const catCacheFile = () => path.join(DATA_DIR, `categories-${state.settings.general.region}.json`);
+
+const readCatCache = () => {
+  try {
+    const d = JSON.parse(fs.readFileSync(catCacheFile(), 'utf8'));
+    return Array.isArray(d.items) && d.items.length ? d : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Whole category tree as a flat list including the path. Building it costs ~200
+ * requests (Audible throttles that), so the result is kept on disk and in memory for
+ * 24 hours. If the build fails, an older snapshot is used instead of an empty page.
+ */
+export async function categoryIndex() {
+  const disk = readCatCache();
+  if (disk && Date.now() - disk.at < CATEGORY_TTL) return disk.items;
+  let items;
+  try {
+    items = await cached(`catindex:${state.settings.general.region}`, CATEGORY_TTL, async () => {
+      const d = await audibleFetch(catUrl(), { headers: { Accept: 'application/json' } });
+      const all = (d.categories || []).map((c) => ({ id: c.id, name: c.name, depth: 0, path: c.name }));
+      let level = all.slice();
+      for (let depth = 1; depth <= 3; depth++) {
+        const next = [];
+        for (let i = 0; i < level.length; i += 6) {
+          const batch = level.slice(i, i + 6);
+          const res = await Promise.all(batch.map((n) => audibleFetch(catUrl(`/${n.id}`), { headers: { Accept: 'application/json' } }).catch(() => ({}))));
+          res.forEach((r, j) => {
+            for (const k of ((r.category || {}).children || [])) {
+              const node = { id: k.id, name: k.name, depth, path: `${batch[j].path} > ${k.name}` };
+              next.push(node);
+              all.push(node);
+            }
+          });
+        }
+        level = next;
+        if (!level.length) break;
+      }
+      return all;
+    });
+  } catch (e) {
+    if (disk) {
+      console.warn('[spokarr] category tree could not be refreshed, using snapshot of', new Date(disk.at).toISOString(), '-', e.message);
+      return disk.items;
+    }
+    throw e;
+  }
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(catCacheFile(), JSON.stringify({ at: Date.now(), items }));
+  } catch {}
+  return items;
+}
+
+/** Map a genre name or path ("Science Fiction > Space Opera") to a category node. */
+export async function findGenre(genre) {
+  const q = String(genre || '').trim();
+  if (!q) return null;
+  const idx = await categoryIndex();
+  const parts = q.split(/\s*[>\/]\s*/).map((x) => x.trim()).filter(Boolean);
+  const key = (s) => s.split(' > ').map(norm).join(' > ');
+  if (parts.length > 1) {
+    const want = parts.map(norm).join(' > ');
+    return idx.find((n) => key(n.path) === want)
+      || idx.find((n) => key(n.path).endsWith(' > ' + want))
+      || null;
+  }
+  const n = norm(q);
+  // The same name exists under several parents ("Science Fiction" below Liebesromane
+  // and below Science Fiction & Fantasy) - prefer the branch whose parent carries it.
+  const rank = (c) => {
+    const parent = c.path.split(' > ').slice(-2, -1)[0] || '';
+    return (norm(parent).includes(n) ? 0 : 1) * 10 + c.depth;
+  };
+  const exact = idx.filter((c) => norm(c.name) === n).sort((a, b) => rank(a) - rank(b));
+  if (exact.length) return exact[0];
+  return idx.filter((c) => norm(c.name).includes(n)).sort((a, b) => rank(a) - rank(b))[0] || null;
+}
+
+/** All genre names and paths for the picker in the settings. */
+export async function genreNames() {
+  const idx = await categoryIndex();
+  return idx.map((c) => c.path);
+}
+
+export async function browseGenre(genre, { q = '', sort = 'popular', limit = 150 } = {}) {
+  const lang = contentLanguage();
+  const apiSort = sort === 'rating' ? 'AvgRating' : 'BestSellers';
+  return cached(`genre:${state.settings.general.region}:${genre}:${sort}:${limit}:${q.toLowerCase()}`.replace(/\s+/g, '_'), 10 * 60e3, async () => {
+    // Category tree not reachable right now (Audible throttling): fall back to keywords
+    let cat = null;
+    try {
+      cat = await findGenre(genre);
+    } catch (e) {
+      console.warn('[spokarr] category tree not reachable, searching by keyword:', e.message);
+    }
+    if (!cat) return searchAudible({ keywords: q || genre, products_sort_by: 'Relevance', num_results: 50 }, { languageOnly: true });
+    // Fetch more pages than needed: language and book type filtering drops many hits
+    const pages = Math.min(6, Math.max(2, Math.ceil(limit / 50) + 1));
+    const seen = new Set();
+    let items = [];
+    for (let page = 0; page < pages; page++) {
+      const d = await audible({ category_id: cat.id, products_sort_by: apiSort, num_results: 50, page });
+      const prods = d.products || [];
+      for (const p of prods) {
+        if (p.content_delivery_type && !BOOK_TYPES.has(p.content_delivery_type)) continue;
+        if (p.language && p.language !== lang) continue;
+        if (seen.has(p.asin)) continue;
+        seen.add(p.asin);
+        items.push(mapProduct(p));
+      }
+      if (prods.length < 50 || items.length >= limit * 2) break;
+    }
+    if (sort === 'hot' || sort === 'new') {
+      const days = sort === 'hot' ? 365 : 550;
+      const cutoff = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+      items = items.filter((b) => b.release && b.release >= cutoff);
+    }
+    if (sort === 'new' || sort === 'old') {
+      items.sort((a, b) => (a.release || '').localeCompare(b.release || '') * (sort === 'new' ? -1 : 1));
+    } else if (sort === 'long') {
+      items.sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
+    }
+    const n = norm(q);
+    if (n) items = items.filter((b) => norm(b.title).includes(n) || (b.authors || []).some((a) => norm(a).includes(n)));
+    return items.slice(0, limit);
+  });
+}
+
 export async function getBook(asin) {
   return cached(`book:${state.settings.general.region}:${asin}`, 6 * 3600e3, async () => {
     const u = new URL(`${base()}/${encodeURIComponent(asin)}`);
@@ -103,9 +256,9 @@ export async function getBook(asin) {
   });
 }
 
-export async function discoverRows() {
+export async function discoverRows(sortOverride = '') {
   const g = state.settings.general;
-  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.discoverRows)}`, 30 * 60e3, async () => {
+  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.discoverRows)}:${JSON.stringify(g.discoverGenres || [])}:${sortOverride}:${g.genreSort || ''}:${g.rowItems || 20}`, 30 * 60e3, async () => {
     const today = new Date().toISOString().slice(0, 10);
     const cutoff = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
     const jobs = [
@@ -118,9 +271,11 @@ export async function discoverRows() {
         if (narr) items = items.filter((b) => b.narrators.some((n) => norm(n) === narr));
         return items;
       }]),
+      // Custom genre rows: resolve the Audible category node and show its bestsellers
+      ...(g.discoverGenres || []).filter(Boolean).map((genre, i) => ['genre' + i, genre, async () => browseGenre(genre, { sort: sortOverride || g.genreSort || 'popular', limit: 50 })]),
     ];
     return Promise.all(jobs.map(async ([id, title, fn]) => {
-      try { return { id, title, items: (await fn()).slice(0, 20) }; } catch (e) { return { id, title, items: [], error: e.message }; }
+      try { return { id, title, items: (await fn()).slice(0, g.rowItems || 20) }; } catch (e) { return { id, title, items: [], error: e.message }; }
     }));
   });
 }

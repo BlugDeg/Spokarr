@@ -8,6 +8,7 @@ const REGION_NAMES = { us: 'audible.com (US)', uk: 'audible.co.uk', ca: 'audible
 const LANGS = ['english', 'german', 'french', 'italian', 'spanish', 'japanese'];
 let data = null;
 let libraries = null;
+let genres = null;
 
 export async function pageSettings(tab = 'general') {
   if (!TABS.includes(tab)) tab = 'general';
@@ -19,6 +20,19 @@ export async function pageSettings(tab = 'general') {
     <nav class="tabs">${TABS.map((k) => `<a href="#/settings/${k}" class="${k === tab ? 'on' : ''}">${esc(t('settings.' + k))}</a>`).join('')}</nav>
     <div class="settings-body">${({ general, abs, downloads, indexers, notifications, about })[tab]()}</div>`;
   ({ general: bindGeneral, abs: bindAbs, downloads: bindDownloads, indexers: bindIndexers, notifications: bindNotifications, about: () => {} })[tab]();
+  // The genre list costs a full category-tree build on a cold start (~45 s) - never wait for it
+  // before the page is visible, the datalist is filled afterwards.
+  if (!genres) fillGenres();
+}
+
+async function fillGenres() {
+  try {
+    genres = await api('/api/genres');
+  } catch {
+    genres = [];
+  }
+  const list = document.getElementById('genreList');
+  if (list) list.innerHTML = genres.map((n) => `<option value="${esc(n)}"></option>`).join('');
 }
 
 // ---------- building blocks ----------
@@ -42,6 +56,7 @@ async function save(body) {
 function general() {
   const g = data.general;
   const rows = g.discoverRows || [];
+  const genreNames = genres || [];
   return `<form id="f">
     ${section(t('settings.region'), `
       ${field(t('settings.region'), `<select name="region">${data.regions.map((r) => `<option value="${r}" ${r === g.region ? 'selected' : ''}>${esc(REGION_NAMES[r] || r)}</option>`).join('')}</select>`, t('settings.regionHint'))}
@@ -49,6 +64,10 @@ function general() {
     ${section(t('settings.rows'), `
       <div class="row-editor" id="rows">${rows.map(rowEditor).join('')}</div>
       <button type="button" class="btn btn-ghost btn-sm" id="addRow">${icon.plus}${esc(t('settings.addRow'))}</button>`, t('settings.rowsHint'))}
+    ${section(t('settings.genres'), `
+      ${field(t('settings.genres'), text('discoverGenres', (g.discoverGenres || []).join(', '), 'placeholder="Science Fiction, Krimi" list="genreList"') + `<datalist id="genreList">${(genreNames || []).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>`, t('settings.genresHint'))}
+      ${field(t('settings.genreSort'), `<select name="genreSort">${['popular','hot','new','rating','old','long'].map((k) => `<option value="${k}" ${k === (g.genreSort || 'popular') ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}</select>`, t('settings.genreSortHint'))}
+      ${field(t('settings.rowItems'), text('rowItems', g.rowItems ?? 20, 'type="number" min="10" max="50"'), t('settings.rowItemsHint'))}`)}
     ${section(t('settings.defaults'), `
       ${toggle('request', g.defaultPermissions.request, t('perm.request'), t('perm.requestHint'))}
       ${toggle('autoApprove', g.defaultPermissions.autoApprove, t('perm.autoApprove'), t('perm.autoApproveHint'))}
@@ -78,6 +97,8 @@ function bindGeneral() {
           region: f.region.value, contentLanguage: f.contentLanguage.value, tagRequester: f.tagRequester.checked,
           appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value),
           discoverRows: [...rows.querySelectorAll('.row-edit')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value]))),
+          discoverGenres: String(f.discoverGenres.value || '').split(',').map((x) => x.trim()).filter(Boolean),
+          genreSort: f.genreSort.value, rowItems: Math.min(50, Math.max(10, Number(f.rowItems.value) || 20)),
           defaultPermissions: { request: f.request.checked, autoApprove: f.autoApprove.checked, manageRequests: f.manageRequests.checked },
         } });
         pageSettings('general');

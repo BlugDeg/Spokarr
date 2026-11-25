@@ -37,6 +37,10 @@ function settingsFromEnv() {
       region: (env.AUDIBLE_REGION || 'us').toLowerCase(),
       contentLanguage: (env.CONTENT_LANGUAGE || '').toLowerCase(),
       discoverRows: rows,
+      // Genres for custom discover rows and the genre search (env only seeds this)
+      discoverGenres: String(env.DISCOVER_GENRES || '').split(/[;,]/).map((x) => x.trim()).filter(Boolean),
+      genreSort: env.GENRE_SORT || 'popular',
+      rowItems: 20,
       defaultPermissions: { ...DEFAULT_PERMISSIONS },
       tagRequester: true,
       appUrl: trimUrl(env.APP_URL),
