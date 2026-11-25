@@ -375,9 +375,11 @@ export async function listBy(kind, name, { limit = 100, sort = 'popular' } = {})
       const partOf = (b) => (b.series || []).find((s) => norm(s.title) === key);
       const items = [];
       const seen = new Set();
-      for (let page = 1; page <= 4 && items.length < limit; page++) {
-        const query = { products_sort_by: 'BestSellers', keywords: value, num_results: 50 };
-        const got = await searchAudible(page === 1 ? query : { ...query, page }, { languageOnly: true });
+      // Audible counts pages from zero, so this has to run 0..3 like `searchPaged()` - counting from
+      // 1 skipped ranks 51-100 and the first request answered a different ranking.
+      for (let page = 0; page < 4 && items.length < limit; page++) {
+        const query = { products_sort_by: 'BestSellers', keywords: value, num_results: 50, ...(page ? { page } : {}) };
+        const got = await searchAudible(query, { languageOnly: true });
         if (!got.length) break;
         for (const b of got) {
           if (!b.asin || seen.has(b.asin) || !partOf(b)) continue;
