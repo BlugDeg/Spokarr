@@ -3,7 +3,7 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.9.0] – unreleased
+## [0.9.0] – 2026-11-25
 
 ### Added
 - **Manual requests** for books that are not, or no longer, in the Audible catalog (older readings such

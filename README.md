@@ -95,6 +95,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 | ![Indexer settings](docs/screenshots/settings.png) | ![SABnzbd, NZBGet, qBittorrent and Transmission settings](docs/screenshots/settings-downloads.png) |
 | **Notifications** | **Sign in with Audiobookshelf** |
 | ![Discord and ntfy notifications](docs/screenshots/settings-notifications.png) | ![Sign in with your Audiobookshelf account](docs/screenshots/login.png) |
+| **Manual request: pick the release** | |
+| ![Manual request for an edition Audible no longer sells](docs/screenshots/manual-request.png) | |
 
 <p align="center">
   <img src="docs/screenshots/mobile-discover.png" width="200" alt="Discover on a phone">
