@@ -3,6 +3,20 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] – 2026-11-25
+
+### Added
+- **Genres**: genre rows on Discover (setting *Genres* or `DISCOVER_GENRES`, picked from all Audible
+  categories of the store), genre search with sorting (popular, current bestsellers, newest, best
+  rated, oldest, longest) and a setting for the number of books per row. The category tree is only
+  loaded when genres are used and cached for 24 h. Thanks @TheLord83 (#6, #3)
+- **Row pages**: a Discover row heading opens the row as a page of its own with up to 150 titles.
+  Thanks @TheLord83 (#8)
+
+### Fixed
+- Cache entries that are still being computed are shared, so two simultaneous requests no longer do
+  the same work twice.
+
 ## [0.5.2] – 2026-11-25
 
 ### Fixed

@@ -45,6 +45,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 **For listeners**
 - 🔎 **Discover and search** the Audible catalog of any store (US, UK, DE, FR, …) – covers, narrators,
   length, series, abridged or unabridged.
+- 🏷️ **Genres**: browse any Audible category, add genre rows to Discover and sort by popularity,
+  rating, release date or length. Every row opens as a page of its own.
 - ➕ **One-tap requests** and a clear status for every book: pending, downloading with progress,
   available.
 - 🎧 **Straight to listening**: “Listen in Audiobookshelf” opens the book in your library.
