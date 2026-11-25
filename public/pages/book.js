@@ -8,6 +8,11 @@ import { can, session } from '../session.js';
 let timer = null;
 export const stopBook = () => clearTimeout(timer);
 const isActive = (b) => ['downloading', 'processing'].includes(b.status?.state);
+// Author, narrator and series lead to their own list page
+const listLink = (kind, name) => `#/list?kind=${kind}&name=${encodeURIComponent(name)}`;
+const nameLinks = (kind, names) => (names || []).map((n) => `<a href="${listLink(kind, n)}">${esc(n)}</a>`).join(', ');
+const seriesLinks = (series) => (series || []).map((s) => `<a href="${listLink('series', s.title)}">${esc(s.title)}</a>`
+  + (s.seq ? ' · ' + esc(t('book.seriesBook', { n: s.seq })) : '')).join(', ');
 
 export async function pageBook(asin) {
   view().innerHTML = `<div class="detail"><div class="detail-inner"><div class="detail-cover skel"></div><div class="detail-info"><div class="skel" style="height:40px;width:70%"></div><div class="skel" style="height:20px;width:40%;margin-top:14px"></div></div></div></div>`;
@@ -21,9 +26,12 @@ async function refresh(asin) {
     if (location.hash !== '#/book/' + asin) return;
     const y = window.scrollY;
     const rel = document.getElementById('relSection');
-    const keep = rel && !rel.hidden ? document.getElementById('relBox').innerHTML : null;
+    const reopen = !!rel && !rel.hidden && relData && relAsin === asin;
     render(b);
-    if (keep) { document.getElementById('relSection').hidden = false; document.getElementById('relBox').innerHTML = keep; bindReleases(b); }
+    if (reopen) {
+      document.getElementById('relSection').hidden = false;
+      renderReleases(document.getElementById('relBox'), relData, b);
+    }
     window.scrollTo(0, y);
     if (isActive(b)) timer = setTimeout(() => refresh(asin), 5000);
   } catch { /* keep the page */ }
@@ -80,8 +88,8 @@ function render(b) {
         <h1>${esc(b.title)}</h1>
         ${b.subtitle ? `<div class="sub">${esc(b.subtitle)}</div>` : ''}
         <div class="facts">
-          <span><b>${esc(t('book.by'))}</b>${esc(b.authors.join(', '))}</span>
-          ${b.narrators.length ? `<span><b>${esc(t('book.narratedBy'))}</b>${esc(b.narrators.join(', '))}</span>` : ''}
+          <span><b>${esc(t('book.by'))}</b>${nameLinks('author', b.authors)}</span>
+          ${b.narrators.length ? `<span><b>${esc(t('book.narratedBy'))}</b>${nameLinks('narrator', b.narrators)}</span>` : ''}
           ${b.minutes ? `<span>${duration(b.minutes)}</span>` : ''}
           ${b.release ? `<span>${year(b.release)}</span>` : ''}
         </div>
@@ -97,9 +105,9 @@ function render(b) {
     </div>
     <div class="section">
       <div class="panel kv">
-        ${series ? row(t('book.series'), esc(series.title) + (series.seq ? ' · ' + esc(t('book.seriesBook', { n: series.seq })) : '')) : ''}
-        ${row(t('book.author'), esc(b.authors.join(', ')))}
-        ${row(t('book.narrator'), esc(b.narrators.join(', ')))}
+        ${b.series?.length ? row(t('book.series'), seriesLinks(b.series)) : ''}
+        ${row(t('book.author'), nameLinks('author', b.authors))}
+        ${row(t('book.narrator'), nameLinks('narrator', b.narrators))}
         ${row(t('book.length'), duration(b.minutes))}
         ${row(t('book.edition'), esc(edition))}
         ${row(t('book.released'), b.manual ? year(b.release) : date(b.release))}
@@ -141,6 +149,30 @@ function render(b) {
   v.querySelector('#relBtn')?.addEventListener('click', () => loadReleases(b));
 }
 
+let relData = null;
+let relAsin = null;
+let relOrder = 'score';
+// Score is the default order the server returns; the rest is a plain local re-sort.
+const REL_ORDERS = {
+  score: null,
+  size: (a, b) => (b.size || 0) - (a.size || 0),
+  // pubDate comes from the indexer as an RFC 822 string, so compare timestamps instead of text
+  new: (a, b) => (Date.parse(b.pubDate) || 0) - (Date.parse(a.pubDate) || 0),
+  seeders: (a, b) => (b.seeders || 0) - (a.seeders || 0),
+  indexer: (a, b) => String(a.indexer || '').localeCompare(String(b.indexer || ''), 'de'),
+};
+
+function renderReleases(box, rels, b) {
+  relData = rels;
+  relAsin = b.asin;
+  const sorted = REL_ORDERS[relOrder] ? [...rels].sort(REL_ORDERS[relOrder]) : rels;
+  box.innerHTML = sorted.length
+    ? `<div class="sortbar"><label class="field"><span>${esc(t('discover.sort'))}</span><select data-rel-order>${['score', 'size', 'new', 'seeders', 'indexer'].map((k) => `<option value="${k}" ${k === relOrder ? 'selected' : ''}>${esc(t('rel.order.' + k))}</option>`).join('')}</select></label></div>`
+      + releaseRows(sorted, t('rel.download'))
+    : `<div class="rel"><div></div><div class="name">${esc(t('rel.none'))}</div></div>`;
+  box.querySelector('[data-rel-order]')?.addEventListener('change', (e) => { relOrder = e.target.value; renderReleases(box, rels, b); });
+  bindReleases(b);
+}
 async function loadReleases(b) {
   const sec = document.getElementById('relSection');
   const box = document.getElementById('relBox');
@@ -148,9 +180,7 @@ async function loadReleases(b) {
   box.innerHTML = `<div class="rel">${spinner}<div class="name">${esc(t('rel.searching'))}</div></div>`;
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
-    const rels = await api(`/api/book/${b.asin}/releases`);
-    box.innerHTML = rels.length ? releaseRows(rels, t('rel.download')) : `<div class="rel"><div></div><div class="name">${esc(t('rel.none'))}</div></div>`;
-    bindReleases(b);
+    renderReleases(box, await api(`/api/book/${b.asin}/releases`), b);
   } catch (e) {
     box.innerHTML = `<div class="rel"><div></div><div class="name">${esc(errText(e))}</div></div>`;
   }

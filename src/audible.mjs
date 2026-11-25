@@ -106,6 +106,48 @@ export const SORTS = {
 };
 
 /**
+ * Sort orders that the catalog API really applies to a scoped query (author, narrator, keywords).
+ * Unlike the genre orders above, a date or length sort is exact here because the result set is
+ * already narrowed down - over the whole catalogue it would be dominated by foreign titles.
+ */
+export const LIST_SORTS = {
+  relevance: 'Relevance',
+  popular: 'BestSellers',
+  new: '-ReleaseDate',
+  old: 'ReleaseDate',
+  rating: 'AvgRating',
+  long: '-RuntimeLength',
+  title: 'Title',
+};
+
+// Author and narrator lists fit on one page of the API, so they are sorted locally - the API's own
+// Title order is not alphabetical at all, and this keeps every order consistent. `popular` keeps
+// the order the API returned (best sellers).
+const locale = (a, b) => String(a || '').localeCompare(String(b || ''), 'de');
+// What to ask the API for, so the 50 titles it returns are already the right ones; the exact order
+// is then done locally (the API's Title order is not alphabetical, so that one starts at best sellers).
+const API_SORT_FOR_LIST = {
+  popular: 'BestSellers', new: '-ReleaseDate', old: 'ReleaseDate',
+  rating: 'AvgRating', long: '-RuntimeLength', title: 'BestSellers',
+};
+
+const LOCAL_SORT = {
+  new: (a, b) => locale(b.release, a.release),
+  old: (a, b) => locale(a.release, b.release),
+  rating: (a, b) => (b.rating || 0) - (a.rating || 0),
+  long: (a, b) => (b.minutes || 0) - (a.minutes || 0),
+  title: (a, b) => locale(a.title, b.title),
+};
+
+// A series is sorted after it has been narrowed down to its own parts - sorting it at the API would
+// drop parts, because the API sorts before we filter. Part number is the natural default.
+const partSeq = (book, key) => Number(String(((book.series || []).find((s) => norm(s.title) === key) || {}).seq || '').replace(',', '.')) || 0;
+const SERIES_SORT = {
+  ...LOCAL_SORT,
+  part: (key) => (a, b) => partSeq(a, key) - partSeq(b, key),
+};
+
+/**
  * Whole category tree of the region as a flat list including the path.
  * The API only returns the children of a single node, so the tree is built
  * bottom-up level by level and cached for 24 hours afterwards.
@@ -314,6 +356,49 @@ export async function discoverRows(sortOverride = '') {
     return Promise.all(jobs.map(async ([id, title, fn]) => {
       try { return { id, title, items: (await fn(limit)).slice(0, limit) }; } catch (e) { return { id, title, items: [], error: e.message }; }
     }));
+  });
+}
+
+/**
+ * Books of one author or narrator, or the parts of a series.
+ * The catalog API knows `author` and `narrator` as filters, so those two do not have to rely on
+ * keywords. A series has no filter of its own: the keyword search is used and the results are
+ * narrowed down to items whose series metadata really carries that title, then ordered by part.
+ */
+export async function listBy(kind, name, { limit = 100, sort = 'popular' } = {}) {
+  const value = String(name || '').trim();
+  if (!value) throw new UserError('list_no_name');
+  const g = state.settings.general;
+  return cached(`list:${g.region}:${contentLanguage()}:${kind}:${value}:${sort}:${limit}`, 10 * 60e3, async () => {
+    if (kind === 'series') {
+      const key = norm(value);
+      const partOf = (b) => (b.series || []).find((s) => norm(s.title) === key);
+      const items = [];
+      const seen = new Set();
+      // Audible counts pages from zero, so this has to run 0..3 like `searchPaged()` - counting from
+      // 1 skipped ranks 51-100 and the first request answered a different ranking.
+      for (let page = 0; page < 4 && items.length < limit; page++) {
+        const query = { products_sort_by: 'BestSellers', keywords: value, num_results: 50, ...(page ? { page } : {}) };
+        const got = await searchAudible(query, { languageOnly: true });
+        if (!got.length) break;
+        for (const b of got) {
+          if (!b.asin || seen.has(b.asin) || !partOf(b)) continue;
+          seen.add(b.asin);
+          items.push(b);
+        }
+      }
+      const order = sort === 'part' || !SERIES_SORT[sort] ? SERIES_SORT.part(key) : SERIES_SORT[sort];
+      return items.sort(order).slice(0, limit);
+    }
+    const param = { author: 'author', narrator: 'narrator' }[kind];
+    if (!param) throw new UserError('list_bad_kind');
+    // No paging here: the author/narrator filter shows the whole list on one page, and the API
+    // returns something else entirely once `page` is sent along with it.
+    const items = await searchAudible({
+      products_sort_by: API_SORT_FOR_LIST[sort] || API_SORT_FOR_LIST.popular, [param]: value, num_results: 50,
+    }, { languageOnly: true });
+    if (LOCAL_SORT[sort]) items.sort(LOCAL_SORT[sort]);
+    return items.slice(0, Math.min(limit, 50));
   });
 }
 
