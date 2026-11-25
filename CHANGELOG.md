@@ -3,6 +3,17 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] – 2026-11-25
+
+### Added
+- **Author, narrator and series are links** on the book page (header and details table). Each opens a
+  list of its own: all books of the author, all books read by the narrator, or all parts of a series
+  in order. A book in two series links both. By TheLord83 (#9) – thanks!
+- **Sort orders** for these lists (popular, newest, oldest, best rated, longest, title A–Z, and part
+  number for a series), for the keyword search (relevance plus the same orders), for the requests list
+  (newest, oldest, title, status) and for the releases of a book (match, largest, newest, most seeders,
+  source).
+
 ## [0.9.0] – 2026-11-25
 
 ### Added
