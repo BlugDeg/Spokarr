@@ -3,7 +3,7 @@ import { LANGUAGES, lang, setLang, t } from './i18n.js';
 import { api, avatar, empty, errText, esc, icon, post, view } from './lib.js';
 import { renderLogin } from './pages/auth.js';
 import { pageBook, stopBook } from './pages/book.js';
-import { pageDiscover, pageSearch } from './pages/catalog.js';
+import { pageDiscover, pageRow, pageSearch } from './pages/catalog.js';
 import { pageRequests, stopRequests } from './pages/requests.js';
 import { pageSettings } from './pages/settings.js';
 import { pageUsers } from './pages/users.js';
@@ -79,6 +79,10 @@ async function route() {
     if ((m = h.match(/^\/?(?:\?(.*))?$/))) {
       setActive('discover');
       await pageDiscover(new URLSearchParams(m[1] || '').get('sort') || '');
+    }
+    else if ((m = h.match(/^\/row\/([a-z0-9]+)(?:\?(.*))?$/))) {
+      setActive('');
+      await pageRow(m[1], new URLSearchParams(m[2] || '').get('sort') || '');
     }
     else if ((m = h.match(/^\/search(?:\?(.*))?$/))) {
       setActive('search');

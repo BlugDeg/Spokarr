@@ -5,7 +5,7 @@ import fss from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { absEnabled, absLibraries, absStatus, absUsers } from './src/abs.mjs';
-import { browseGenre, categoryIndex, contentLanguage, discoverRows, genreNames, getBook, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
+import { browseGenre, categoryIndex, contentLanguage, discoverRow, discoverRows, genreNames, getBook, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
 import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired } from './src/auth.mjs';
 import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
@@ -227,6 +227,12 @@ route('GET', '/api/config', USER, () => ({
 route('GET', '/api/discover', USER, async ({ url }) => {
   const rows = await discoverRows((url.searchParams.get('sort') || '').trim());
   return Promise.all(rows.map(async (r) => ({ ...r, items: await annotate(r.items) })));
+});
+route('GET', /^\/api\/row\/([a-z0-9]+)$/, USER, async ({ m, url }) => {
+  const sort = (url.searchParams.get('sort') || '').trim();
+  const limit = Math.min(150, Math.max(20, Number(url.searchParams.get('limit')) || 100));
+  const row = await discoverRow(m[1], { sort, limit });
+  return { ...row, items: await annotate(row.items) };
 });
 route('GET', '/api/search', USER, async ({ url }) => {
   const q = (url.searchParams.get('q') || '').trim();
