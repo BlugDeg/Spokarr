@@ -271,8 +271,11 @@ export async function getBook(asin) {
 async function searchPaged(params, limit, { languageOnly = false } = {}) {
   const out = [];
   const seen = new Set();
-  for (let page = 1; page <= 4 && out.length < limit; page++) {
-    const got = await searchAudible({ ...params, num_results: 50, page }, { languageOnly });
+  // Audible counts pages from zero: no `page` and `page=0` answer the same, `page=1` is already
+  // results 51-100. Counting from 1 here skipped that block (and the first request was sent with
+  // an explicit page, which returns a different ranking).
+  for (let page = 0; page < 4 && out.length < limit; page++) {
+    const got = await searchAudible({ ...params, num_results: 50, ...(page ? { page } : {}) }, { languageOnly });
     if (!got.length) break;
     for (const b of got) if (b.asin && !seen.has(b.asin)) { seen.add(b.asin); out.push(b); }
   }
