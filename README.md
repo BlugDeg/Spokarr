@@ -86,19 +86,21 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 | Discover | Book details |
 |---|---|
 | ![Discover page](docs/screenshots/discover.png) | ![Book details with approval](docs/screenshots/book.png) |
-| **Requests** | **Users** |
-| ![Requests with filters](docs/screenshots/requests.png) | ![User management](docs/screenshots/users.png) |
+| **Requests** | **Users and invite links** |
+| ![Requests with filters](docs/screenshots/requests.png) | ![User management with invite links](docs/screenshots/users.png) |
 | **Prowlarr and indexers** | **Download clients** |
-| ![Indexer settings](docs/screenshots/settings.png) | ![SABnzbd and qBittorrent settings](docs/screenshots/settings-downloads.png) |
+| ![Indexer settings](docs/screenshots/settings.png) | ![SABnzbd, NZBGet, qBittorrent and Transmission settings](docs/screenshots/settings-downloads.png) |
 | **Notifications** | **Sign in with Audiobookshelf** |
 | ![Discord and ntfy notifications](docs/screenshots/settings-notifications.png) | ![Sign in with your Audiobookshelf account](docs/screenshots/login.png) |
 
 <p align="center">
-  <img src="docs/screenshots/mobile-discover.png" width="240" alt="Discover on a phone">
+  <img src="docs/screenshots/mobile-discover.png" width="200" alt="Discover on a phone">
   &nbsp;
-  <img src="docs/screenshots/mobile-book.png" width="240" alt="Book on a phone">
+  <img src="docs/screenshots/mobile-book.png" width="200" alt="Book on a phone">
   &nbsp;
-  <img src="docs/screenshots/mobile-requests.png" width="240" alt="Requests on a phone">
+  <img src="docs/screenshots/mobile-requests.png" width="200" alt="Requests on a phone">
+  &nbsp;
+  <img src="docs/screenshots/mobile-invite.png" width="200" alt="Creating an account from an invite link">
 </p>
 
 ## How it works
