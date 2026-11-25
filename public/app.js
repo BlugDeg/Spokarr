@@ -80,6 +80,8 @@ async function route() {
   if (!session.user) return;
   stopBook();
   stopRequests();
+  // a dialog belongs to the page it was opened on (back button, links in toasts)
+  document.querySelectorAll('.modal-back').forEach((d) => d.remove());
   const h = location.hash.replace(/^#/, '') || '/';
   window.scrollTo(0, 0);
   try {

@@ -437,3 +437,6 @@ details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
 .manual-hint > div { display: flex; flex-direction: column; gap: 2px; }
 .manual-hint small { color: var(--dim); font-size: 13px; }
 .b-manual { background: rgba(245,158,11,.15); color: #fcd34d; }
+.modal:has(#manPick:not([hidden])) { max-width: 760px; }
+.pick-head { margin: 0 0 4px; font-size: 16px; }
+.pick-list { max-height: 55vh; overflow: auto; margin-bottom: 8px; }

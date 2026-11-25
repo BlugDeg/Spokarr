@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
   and – if wanted – only picks releases that name the narrator. The book is imported with its own
   metadata and not matched against Audible, so the current edition does not overwrite the narrator.
   "Request manually" on the search results and the requests page. Suggested on Reddit – thanks!
+- Manual requests are made in two steps: search first, then **pick a release** from the list (best
+  matches on top, with score and reasons). Nothing is downloaded before that. Without auto-approve the
+  pick waits for approval, and the admin sees which release was chosen.
+- Type "radio play" for manual requests: radio plays are preferred instead of penalised.
+
+### Fixed
+- An author reading their own book counted as narrator match for every release (the author's name is in
+  all of them); now only with an explicit "read by" / "gelesen von".
+- Open dialogs stayed on screen after navigating with the back button.
 
 ## [0.8.0] – 2026-11-25
 

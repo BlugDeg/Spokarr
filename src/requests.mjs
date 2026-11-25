@@ -22,6 +22,7 @@ export function publicRequest(r) {
     id: r.id, asin: r.asin, status: r.status, progress: r.progress || 0, eta: r.eta || '',
     message: r.message || null, createdAt: r.createdAt, updatedAt: r.updatedAt, stalled: !!r.stalled,
     release: r.release ? { title: r.release.title, size: r.release.size, indexer: r.release.indexer, protocol: r.release.protocol || 'usenet' } : null,
+    chosen: r.status === 'pending' && r.chosenGuid ? r.chosen || null : null,
     book: r.book, absId: r.absId || null,
     requestedBy: u ? { id: u.id, username: u.username } : null,
     decidedBy: a ? { id: a.id, username: a.username } : null,
@@ -56,6 +57,7 @@ export async function statusResolver() {
 }
 
 async function startDownload(req, guid) {
+  guid = guid || req.chosenGuid || null;
   const releases = await findReleases(req.book);
   const rel = guid ? releases.find((r) => r.guid === guid) : releases.find((r) => r.ok);
   const running = req.status === 'downloading' && req.download;
@@ -64,7 +66,7 @@ async function startDownload(req, guid) {
     if (running) { req.message = releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found'); return; }
     Object.assign(req, { progress: 0, release: null, nzo: null, download: null, eta: '', stalled: false, updatedAt: new Date().toISOString() });
     req.status = 'not_found';
-    req.message = releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found');
+    req.message = guid ? msg('chosen_gone') : releases.length ? msg('no_safe_match', { count: releases.length }) : msg('nothing_found');
     return;
   }
   // replacing a stalled or running download: remove the old one from its client first
@@ -73,6 +75,8 @@ async function startDownload(req, guid) {
   req.download = await startClientDownload(req, rel);
   req.release = { title: rel.title, size: rel.size, guid: rel.guid, indexer: rel.indexer, protocol: rel.protocol || 'usenet' };
   req.status = 'downloading';
+  // the pick is used once – "search again" on a stalled download must be free to choose another one
+  req.chosenGuid = null;
   log('Downloading', req.book.title, '→', rel.title);
 }
 
@@ -109,7 +113,17 @@ function manualBook(input) {
   };
 }
 
-/** Request by title, author and narrator, without an Audible entry. */
+/** Step 1 of a manual request: search the indexers, nothing is requested or downloaded yet. */
+export async function searchManual(user, input = {}) {
+  if (!user.permissions.request && user.role !== 'admin') throw new UserError('forbidden', {}, 403);
+  const book = manualBook(input);
+  return (await findReleases(book)).map(({ link, ...r }) => r);
+}
+
+/**
+ * Step 2: request with the release the person picked. With auto-approve that release is downloaded
+ * right away; otherwise the request waits for approval and approving downloads exactly that release.
+ */
 export async function createManualRequest(user, input = {}) {
   if (!user.permissions.request && user.role !== 'admin') throw new UserError('forbidden', {}, 403);
   const book = manualBook(input);
@@ -117,7 +131,18 @@ export async function createManualRequest(user, input = {}) {
   const same = state.requests.find((r) => r.book?.manual && key(r.book) === key(book));
   if (same && !['declined', 'not_found', 'failed'].includes(same.status)) throw new UserError('already_requested', {}, 409);
   if (same) Object.assign(book, { asin: same.asin });
-  return submitRequest(user, book.asin, book);
+  const guid = input.guid ? String(input.guid) : null;
+  // Waiting for approval: remember which release was picked, so the admin sees what they approve
+  let chosen = null;
+  const auto = user.role === 'admin' || user.permissions.autoApprove;
+  if (guid && !auto) {
+    const rel = (await findReleases(book)).find((r) => r.guid === guid);
+    if (!rel) throw new UserError('chosen_gone', {}, 409);
+    chosen = { title: rel.title, size: rel.size, indexer: rel.indexer, protocol: rel.protocol || 'usenet' };
+  }
+  const req = await submitRequest(user, book.asin, book, guid);
+  if (chosen && req.status === 'pending') { req.chosen = chosen; await save.requests(); }
+  return req;
 }
 
 /** New request by a user. Users without auto-approve create a pending request. */
@@ -126,7 +151,7 @@ export async function createRequest(user, asin) {
   return submitRequest(user, asin, await bookFor(asin));
 }
 
-async function submitRequest(user, asin, book) {
+async function submitRequest(user, asin, book, guid = null) {
   let req = state.requests.find((r) => r.asin === asin);
   if (req && !['declined', 'not_found', 'failed'].includes(req.status)) throw new UserError('already_requested', {}, 409);
   const now = new Date().toISOString();
@@ -134,11 +159,11 @@ async function submitRequest(user, asin, book) {
     req = { id: randomId(5), asin, createdAt: now };
     state.requests.unshift(req);
   }
-  Object.assign(req, { book, manual: !!book.manual, requestedBy: user.id, decidedBy: null, updatedAt: now, message: null, release: null });
+  Object.assign(req, { book, manual: !!book.manual, requestedBy: user.id, decidedBy: null, updatedAt: now, message: null, release: null, chosenGuid: guid });
   const auto = user.role === 'admin' || user.permissions.autoApprove;
   if (auto) {
     req.decidedBy = user.id;
-    await startDownload(req);
+    await startDownload(req, guid);
     if (req.status === 'not_found') notify('failed', req, { reasonKey: 'not_found' });
   } else {
     req.status = 'pending';

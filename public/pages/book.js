@@ -1,7 +1,7 @@
 // Book detail page
 import { t } from '../i18n.js';
 import {
-  api, avatar, badge, busy, coverOf, date, duration, errText, esc, icon, languageName, msgText, post, since, size, spinner, toast, view, year,
+  api, avatar, badge, busy, coverOf, date, releaseRows, duration, errText, esc, icon, languageName, msgText, post, since, size, spinner, toast, view, year,
 } from '../lib.js';
 import { can, session } from '../session.js';
 
@@ -65,6 +65,7 @@ function render(b) {
     ? `<div class="progress"><i style="width:${Math.max(2, st.progress || 0)}%"></i></div><div class="facts" style="margin-top:8px"><span>${Math.round(st.progress || 0)} %${req?.eta ? ' · ' + esc(t('book.left', { t: req.eta })) : ''}</span></div>`
     : '';
   const message = req?.message && st?.state !== 'available' ? `<div class="facts note">${esc(msgText(req.message))}</div>` : '';
+  const chosen = req?.chosen ? `<div class="facts note">${esc(t('manual.chosen'))}: <b>${esc(req.chosen.title)}</b> · ${size(req.chosen.size)} · ${esc(req.chosen.indexer)}</div>` : '';
   const requester = req?.requestedBy && st?.state !== 'available'
     ? `<div class="facts requester">${avatar(req.requestedBy.username, 'sm')}<span>${esc(t('book.requestedBy', { name: req.requestedBy.username }))} · ${esc(since(req.createdAt))}</span></div>` : '';
   const row = (label, value) => `<div>${esc(label)}</div><div>${value || '–'}</div>`;
@@ -84,7 +85,7 @@ function render(b) {
           ${b.minutes ? `<span>${duration(b.minutes)}</span>` : ''}
           ${b.release ? `<span>${year(b.release)}</span>` : ''}
         </div>
-        ${requester}${message}${progress}
+        ${requester}${chosen}${message}${progress}
         <div class="actions">${actionButtons(b)}</div>
       </div>
     </div>
@@ -148,15 +149,7 @@ async function loadReleases(b) {
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
     const rels = await api(`/api/book/${b.asin}/releases`);
-    box.innerHTML = rels.length ? rels.map((r) => `
-      <div class="rel">
-        <div class="score ${r.ok ? 'good' : r.score < 30 ? 'bad' : ''}">${r.score}</div>
-        <div>
-          <div class="name">${esc(r.title)}</div>
-          <div class="why"><span class="proto proto-${r.protocol === 'torrent' ? 'torrent' : 'usenet'}">${r.protocol === 'torrent' ? 'Torrent' : 'Usenet'}</span><span>${size(r.size)}</span>${r.seeders != null ? `<span>${esc(t('rel.seeders', { n: r.seeders }))}</span>` : ''}<span>${esc(r.indexer)}</span>${r.pubDate ? `<span>${since(r.pubDate)}</span>` : ''}${r.plus.map((x) => `<span class="pos">✓ ${esc(t('rel.plus.' + x))}</span>`).join('')}${r.minus.map((x) => `<span class="neg">✕ ${esc(t('rel.minus.' + x))}</span>`).join('')}</div>
-        </div>
-        <button class="btn btn-sm ${r.ok ? 'btn-primary' : 'btn-ghost'}" data-guid="${esc(r.guid)}">${icon.down}${esc(t('rel.download'))}</button>
-      </div>`).join('') : `<div class="rel"><div></div><div class="name">${esc(t('rel.none'))}</div></div>`;
+    box.innerHTML = rels.length ? releaseRows(rels, t('rel.download')) : `<div class="rel"><div></div><div class="name">${esc(t('rel.none'))}</div></div>`;
     bindReleases(b);
   } catch (e) {
     box.innerHTML = `<div class="rel"><div></div><div class="name">${esc(errText(e))}</div></div>`;
