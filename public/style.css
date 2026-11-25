@@ -141,6 +141,8 @@ img { display: block; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 0; max-width: 520px; }
 .kv div { padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
 .kv div:nth-child(odd) { color: var(--muted); }
+.facts a, .kv a { color: inherit; text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: 2px; }
+.facts a:hover, .kv a:hover { color: #fff; text-decoration-color: var(--accent); }
 .kv div:nth-last-child(-n+2) { border-bottom: 0; }
 .detail-grid { display: grid; grid-template-columns: 1fr 340px; gap: 34px; align-items: start; }
 

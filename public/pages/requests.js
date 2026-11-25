@@ -6,7 +6,18 @@ import { can, session } from '../session.js';
 
 let timer = null;
 let filter = 'all';
+let order = 'new';
 export const stopRequests = () => clearTimeout(timer);
+
+// Order of the list; the filter above decides which requests are shown, this decides their order.
+const STATUS_ORDER = ['pending', 'downloading', 'processing', 'available', 'not_found', 'failed', 'declined'];
+const ORDERS = {
+  new: (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+  old: (a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+  title: (a, b) => String(a.book?.title || '').localeCompare(String(b.book?.title || ''), 'de'),
+  status: (a, b) => (STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
+    || String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+};
 
 const FILTERS = {
   all: () => true,
@@ -26,12 +37,14 @@ export async function pageRequests(quiet = false) {
   if (location.hash !== '#/requests') return;
   const keys = manager ? Object.keys(FILTERS) : ['all', 'pending', 'active', 'available', 'problems'];
   const count = (k) => list.filter(FILTERS[k]).length;
-  const shown = list.filter(FILTERS[filter]);
+  const shown = list.filter(FILTERS[filter]).sort(ORDERS[order] || ORDERS.new);
   v.innerHTML = `
     <div class="page-head"><h1 class="page-title">${esc(t('req.title'))}</h1>${can('request') ? `<button class="btn btn-ghost" id="manualBtn">${icon.plus}${esc(t('manual.open'))}</button>` : ''}</div>
     <div class="chips">${keys.map((k) => `<button class="chip ${k === filter ? 'on' : ''}" data-filter="${k}">${esc(t('req.filter.' + k))}<span>${count(k)}</span></button>`).join('')}</div>
+    ${shown.length ? `<div class="sortbar"><label class="field"><span>${esc(t('discover.sort'))}</span><select data-order>${['new', 'old', 'title', 'status'].map((k) => `<option value="${k}" ${k === order ? 'selected' : ''}>${esc(t('req.order.' + k))}</option>`).join('')}</select></label></div>` : ''}
     ${shown.length ? `<div class="req-list">${shown.map((r) => item(r, manager)).join('')}</div>` : empty(icon.book, t('req.empty'))}`;
 
+  v.querySelector('[data-order]')?.addEventListener('change', (e) => { order = e.target.value; pageRequests(true); });
   v.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.filter; pageRequests(true); }));
   v.querySelector('#manualBtn')?.addEventListener('click', () => openManualRequest());
   v.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {

@@ -5,13 +5,18 @@ import { manualHint, openManualRequest } from './manual.js';
 import { can } from '../session.js';
 
 const SORT_KEYS = ['popular', 'hot', 'new', 'rating', 'old', 'long'];
+// Author/narrator/keyword lists: the API sorts these itself, and a date or length sort is exact
+// because the query is already scoped.
+const LIST_SORT_KEYS = ['popular', 'new', 'rating', 'old', 'long', 'title'];
+const SERIES_SORT_KEYS = ['part', ...LIST_SORT_KEYS];
+const SEARCH_SORT_KEYS = ['relevance', 'popular', 'new', 'rating', 'old', 'long'];
 
 // Same look as in the settings: label above the select
-const sortField = (current, attr) => `
+const sortField = (current, attr, keys = SORT_KEYS) => `
   <label class="field">
     <span>${esc(t('discover.sort'))}</span>
     <select ${attr}>
-      ${SORT_KEYS.map((k) => `<option value="${k}" ${k === current ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}
+      ${keys.map((k) => `<option value="${k}" ${k === current ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}
     </select>
   </label>`;
 
@@ -43,6 +48,36 @@ export async function pageDiscover(sort = '') {
   v.querySelector('[data-discover-sort]')?.addEventListener('change', (e) => {
     const s = e.target.value;
     location.hash = s === 'popular' ? '#/' : '#/?sort=' + encodeURIComponent(s);
+  });
+}
+
+const LIST_TITLES = { author: 'list.byAuthor', narrator: 'list.byNarrator', series: 'list.series' };
+
+/** All books of one author or narrator, or the parts of a series (sorted by part). */
+export async function pageList(kind, name, sort = '') {
+  const v = view();
+  const titleKey = LIST_TITLES[kind];
+  if (!titleKey || !name) { location.hash = '#/'; return; }
+  const isSeries = kind === 'series';
+  const keys = isSeries ? SERIES_SORT_KEYS : LIST_SORT_KEYS;
+  const current = sort || (isSeries ? 'part' : 'popular');
+  v.innerHTML = `<div class="grid">${'<div class="skel skel-card"></div>'.repeat(12)}</div>`;
+  let res;
+  try {
+    res = await api(`/api/list?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(name)}&sort=${encodeURIComponent(current)}`);
+  } catch (e) {
+    v.innerHTML = empty(icon.warn, errText(e));
+    return;
+  }
+  const items = res.items || [];
+  const back = `#/list?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(name)}`;
+  v.innerHTML = `<h1 class="page-title">${esc(t(titleKey, { name }))}</h1>`
+    + `<div class="sortbar">${sortField(current, 'data-list-sort', keys)}</div>`
+    + (items.length
+      ? `<p class="muted">${items.length} ${esc(t('search.results'))}</p><div class="grid">${items.map(card).join('')}</div>`
+      : empty(icon.search, t('search.none')));
+  v.querySelector('[data-list-sort]').addEventListener('change', (e) => {
+    location.hash = `${back}&sort=${encodeURIComponent(e.target.value)}`;
   });
 }
 
@@ -80,7 +115,7 @@ export async function pageSearch(q, genre = '', sort = '') {
   input.value = q;
   const cfg = await api('/api/config').catch(() => ({ genres: [] }));
   const chips = chipBar(cfg.genres || [], genre);
-  const current = sort || 'popular';
+  const current = sort || (genre ? 'popular' : 'relevance');
   if (!q && !genre) {
     v.innerHTML = chips + empty(icon.search, t('search.prompt'));
     if (matchMedia('(max-width: 1023px)').matches) input.focus();
@@ -89,11 +124,12 @@ export async function pageSearch(q, genre = '', sort = '') {
   const title = q && genre ? t('search.titleForGenre', { q, g: genre })
     : genre ? t('search.byGenre', { g: genre }) : t('search.titleFor', { q });
   const head = `<h1 class="page-title">${esc(title)}</h1>${chips}` +
-    (genre ? `<div class="sortbar">${sortField(current, 'data-search-sort')}</div>` : '');
+    `<div class="sortbar">${sortField(current, 'data-search-sort', genre ? SORT_KEYS : SEARCH_SORT_KEYS)}</div>`;
   v.innerHTML = head + `<div class="grid">${'<div class="skel skel-card"></div>'.repeat(12)}</div>`;
   const params = new URLSearchParams();
   if (q) params.set('q', q);
-  if (genre) { params.set('genre', genre); params.set('sort', current); }
+  if (genre) params.set('genre', genre);
+  params.set('sort', current);
   const items = await api('/api/search?' + params.toString());
   v.innerHTML = head.replace('</h1>', `</h1>`) +
     (items.length
@@ -103,8 +139,9 @@ export async function pageSearch(q, genre = '', sort = '') {
   v.querySelector('[data-manual]')?.addEventListener('click', () => openManualRequest({ title: q }));
   const sel = v.querySelector('[data-search-sort]');
   if (sel) sel.addEventListener('change', (e) => {
-    const p = new URLSearchParams({ genre, sort: e.target.value });
+    const p = new URLSearchParams({ sort: e.target.value });
     if (q) p.set('q', q);
+    if (genre) p.set('genre', genre);
     location.hash = '#/search?' + p.toString();
   });
 }
