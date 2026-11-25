@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import { absCreateApiKey, absLogin } from './abs.mjs';
 import { DEFAULT_PERMISSIONS, save, state } from './store.mjs';
-import { log, randomId, UserError } from './util.mjs';
+import { clientIp, isHttps, log, randomId, UserError } from './util.mjs';
 
 const COOKIE = 'spokarr_session';
 const SESSION_DAYS = 30;
@@ -48,7 +48,7 @@ export function sessionUser(req) {
 }
 
 function cookieHeader(req, token, maxAgeSec) {
-  const secure = req.headers['x-forwarded-proto'] === 'https' || req.socket.encrypted;
+  const secure = isHttps(req);
   return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secure ? '; Secure' : ''}`;
 }
 
@@ -65,7 +65,7 @@ function noteFailure(ip) {
 }
 
 export async function login(req, res, { username, password }) {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  const ip = clientIp(req);
   checkRate(ip);
   if (!username || !password) throw new UserError('login_failed', {}, 401);
   let result;

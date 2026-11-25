@@ -14,6 +14,8 @@ import {
 import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
 import { testTransmission } from './src/transmission.mjs';
+import { createInvite, deleteInvite, inviteInfo, publicInvite, redeemInvite } from './src/invites.mjs';
+import { availableUpdate, checkUpdateNow, latestRelease, startUpdateCheck } from './src/update.mjs';
 import { testNzbget } from './src/nzbget.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
@@ -87,6 +89,7 @@ function applySettings(body) {
     if (g.tagRequester !== undefined) s.general.tagRequester = bool(g.tagRequester);
     if (g.appUrl !== undefined) s.general.appUrl = trimUrl(g.appUrl);
     if (g.notifyLanguage !== undefined) s.general.notifyLanguage = g.notifyLanguage === 'de' ? 'de' : 'en';
+    if (g.updateCheck !== undefined) s.general.updateCheck = bool(g.updateCheck);
     if (g.stallHours !== undefined) s.general.stallHours = Math.min(168, Math.max(1, Number(g.stallHours) || 6));
   }
   if (body.abs) {
@@ -218,6 +221,8 @@ route('GET', '/api/status', PUBLIC_ROUTE, ({ user }) => ({
   absConfigured: !!state.settings.abs.url,
   absUrl: state.settings.abs.publicUrl || state.settings.abs.url,
   user: publicUser(user),
+  // Only admins can update the container, so only they see the hint
+  update: user?.role === 'admin' ? availableUpdate() : null,
 }));
 route('POST', '/api/setup/abs', PUBLIC_ROUTE, async ({ body }) => {
   if (!setupRequired()) throw new UserError('forbidden', {}, 403);
@@ -235,6 +240,7 @@ route('POST', '/api/auth/logout', PUBLIC_ROUTE, async ({ req, res }) => { await 
 route('GET', '/api/genres', USER, () => genreNames());
 route('GET', '/api/config', USER, () => ({
   region: state.settings.general.region, absUrl: state.settings.abs.publicUrl || state.settings.abs.url, absEnabled: absEnabled(),
+  appUrl: state.settings.general.appUrl || '',
   genres: state.settings.general.discoverGenres || [], genreSort: state.settings.general.genreSort || 'popular',
 }));
 route('GET', '/api/discover', USER, async ({ url }) => {
@@ -331,14 +337,25 @@ route('POST', '/api/users/import', ADMIN, async () => {
   return { added };
 });
 
+// ---------- Invites ----------
+route('GET', '/api/invites', ADMIN, () => state.invites.map(publicInvite).reverse());
+route('POST', '/api/invites', ADMIN, ({ user, body }) => {
+  if (!absEnabled()) throw new UserError('abs_not_configured');
+  return createInvite(user, body);
+});
+route('DELETE', /^\/api\/invites\/([a-z0-9]+)$/, ADMIN, async ({ m }) => { await deleteInvite(m[1]); return { ok: true }; });
+route('GET', /^\/api\/invite\/([a-f0-9]+)$/, PUBLIC_ROUTE, ({ m }) => inviteInfo(m[1]));
+route('POST', /^\/api\/invite\/([a-f0-9]+)$/, PUBLIC_ROUTE, async ({ req, res, m, body }) => ({ user: publicUser(await redeemInvite(req, res, m[1], body)) }));
+
 // ---------- Settings ----------
-route('GET', '/api/settings', ADMIN, () => ({ ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS }));
+route('GET', '/api/settings', ADMIN, () => ({ ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS, latest: latestRelease() }));
 route('PUT', '/api/settings', ADMIN, async ({ body }) => {
   applySettings(body);
   await save.settings();
   // Genres just switched on? Fetch the tree in the background instead of on the first page view.
   if ((state.settings.general.discoverGenres || []).length) setTimeout(() => warmGenres(), 500);
-  return { ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS };
+  if (state.settings.general.updateCheck !== false && !latestRelease()) await checkUpdateNow();
+  return { ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS, latest: latestRelease() };
 });
 route('POST', '/api/settings/test/abs', ADMIN, async ({ body }) => {
   const url = trimUrl(body.url ?? state.settings.abs.url);
@@ -429,6 +446,7 @@ server.listen(PORT, () => {
   log(`Spokarr ${VERSION} listening on port ${PORT} (Audible ${state.settings.general.region}, language ${contentLanguage()})`);
   // Only warm up when genres are in use - see warmGenres().
   if ((state.settings.general.discoverGenres || []).length) setTimeout(() => warmGenres(), 4000);
+  startUpdateCheck(VERSION);
   if (setupRequired()) log('Setup required: open the web interface and sign in with an Audiobookshelf admin account');
 });
 setInterval(poll, 15000);

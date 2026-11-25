@@ -1,6 +1,6 @@
 // User management (admins)
 import { t } from '../i18n.js';
-import { api, avatar, busy, confirmDialog, del, empty, errText, esc, icon, modal, post, put, since, toast, view } from '../lib.js';
+import { api, avatar, busy, confirmDialog, copyText, date, del, empty, errText, esc, icon, modal, post, put, since, toast, view } from '../lib.js';
 import { session } from '../session.js';
 
 const PERMS = ['request', 'autoApprove', 'manageRequests'];
@@ -9,12 +9,15 @@ const roleLabel = (u) => (u.owner ? t('users.role.owner') : t('users.role.' + u.
 export async function pageUsers() {
   const v = view();
   v.innerHTML = `<h1 class="page-title">${esc(t('users.title'))}</h1><div class="user-list">${'<div class="skel" style="height:76px"></div>'.repeat(3)}</div>`;
-  const users = await api('/api/users');
+  const [users, invites] = await Promise.all([api('/api/users'), api('/api/invites').catch(() => [])]);
   if (location.hash !== '#/users') return;
   v.innerHTML = `
     <div class="page-head">
       <h1 class="page-title">${esc(t('users.title'))}</h1>
-      <button class="btn btn-ghost" id="importBtn">${icon.import}${esc(t('users.import'))}</button>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="importBtn">${icon.import}${esc(t('users.import'))}</button>
+        <button class="btn btn-primary" id="inviteBtn">${icon.userPlus}${esc(t('invite.create'))}</button>
+      </div>
     </div>
     ${users.length ? `<div class="user-list">${users.map((u) => `
       <button class="panel user-row" data-user="${u.id}">
@@ -26,7 +29,14 @@ export async function pageUsers() {
         </div>
         <div class="user-stats"><b>${u.requestCount}</b><span>${esc(t('nav.requests'))}</span></div>
         <span class="chev">${icon.edit}</span>
-      </button>`).join('')}</div>` : empty(icon.book, t('users.empty'))}`;
+      </button>`).join('')}</div>` : empty(icon.book, t('users.empty'))}
+    ${inviteList(invites)}`;
+  v.querySelector('#inviteBtn').addEventListener('click', createInvite);
+  v.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyLink(b.dataset.copy)));
+  v.querySelectorAll('[data-revoke]').forEach((b) => b.addEventListener('click', async () => {
+    if (!(await confirmDialog(t('invite.deleteConfirm')))) return;
+    try { await del('/api/invites/' + b.dataset.revoke); pageUsers(); } catch (err) { toast(errText(err), 'err'); }
+  }));
 
   v.querySelector('#importBtn').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try { const r = await post('/api/users/import'); toast(t('users.imported', { n: r.added }), 'ok'); pageUsers(); } catch (err) { toast(errText(err), 'err'); }
@@ -77,5 +87,56 @@ function editUser(u) {
   m.querySelector('#delUser')?.addEventListener('click', async () => {
     if (!(await confirmDialog(t('users.deleteConfirm', { name: u.username })))) return;
     try { await del('/api/users/' + u.id); m.remove(); pageUsers(); } catch (err) { toast(errText(err), 'err'); }
+  });
+}
+
+// ---------- Invite links ----------
+// The link uses the address from the settings (behind a proxy) or the one this page was opened with
+const inviteUrl = (token) => `${(session.config.appUrl || location.origin).replace(/\/+$/, '')}/#/invite/${token}`;
+async function copyLink(token) {
+  const ok = await copyText(inviteUrl(token));
+  toast(ok ? t('invite.copied') : inviteUrl(token), ok ? 'ok' : '');
+}
+function inviteList(list) {
+  if (!list.length) return '';
+  return `<h2 class="subhead">${esc(t('invite.title'))}</h2>
+    <div class="invite-list">${list.map((i) => `
+      <div class="panel invite-row${i.open ? '' : ' closed'}">
+        <div class="invite-main">
+          <b>${esc(i.note || t('invite.noNote'))}</b>
+          <small>${esc(i.open ? t('invite.validUntil', { date: date(i.expires) }) : t('invite.closed'))} · ${esc(i.maxUses ? t('invite.usesOf', { n: i.uses, max: i.maxUses }) : t('invite.usesUnlimited', { n: i.uses }))}${i.users.length ? ' · ' + esc(i.users.join(', ')) : ''}</small>
+        </div>
+        ${i.open ? `<button class="btn btn-ghost btn-sm" data-copy="${esc(i.token)}">${icon.copy}${esc(t('invite.copy'))}</button>` : ''}
+        <button class="icon-btn" data-revoke="${esc(i.id)}" title="${esc(t('invite.delete'))}" aria-label="${esc(t('invite.delete'))}">${icon.trash}</button>
+      </div>`).join('')}</div>`;
+}
+function createInvite() {
+  const m = modal(t('invite.create'), `
+    <p class="muted">${esc(t('invite.intro'))}</p>
+    <form class="form" id="invForm">
+      <label class="field"><span>${esc(t('invite.note'))}</span><input name="note" maxlength="80" placeholder="${esc(t('invite.notePlaceholder'))}"><small>${esc(t('invite.noteHint'))}</small></label>
+      <div class="grid-2">
+        <label class="field"><span>${esc(t('invite.validFor'))}</span><select name="days">
+          <option value="1">${esc(t('invite.days', { n: 1 }))}</option><option value="7" selected>${esc(t('invite.days', { n: 7 }))}</option><option value="30">${esc(t('invite.days', { n: 30 }))}</option></select></label>
+        <label class="field"><span>${esc(t('invite.uses'))}</span><select name="maxUses">
+          <option value="1" selected>${esc(t('invite.once'))}</option><option value="5">5×</option><option value="10">10×</option><option value="0">${esc(t('invite.unlimited'))}</option></select></label>
+      </div>
+      <div class="modal-actions"><button type="submit" class="btn btn-primary">${icon.link}${esc(t('invite.createBtn'))}</button></div>
+    </form>`);
+  const form = m.querySelector('#invForm');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy(form.querySelector('[type=submit]'), async () => {
+      try {
+        const inv = await post('/api/invites', { note: form.note.value, days: Number(form.days.value), maxUses: Number(form.maxUses.value) });
+        const url = inviteUrl(inv.token);
+        form.outerHTML = `<div class="form">
+          <label class="field"><span>${esc(t('invite.link'))}</span><input class="invite-link" readonly value="${esc(url)}"><small>${esc(t('invite.linkHint'))}</small></label>
+          <div class="modal-actions"><button type="button" class="btn btn-primary" id="copyNew">${icon.copy}${esc(t('invite.copy'))}</button></div></div>`;
+        m.querySelector('.invite-link').addEventListener('focus', (ev) => ev.target.select());
+        m.querySelector('#copyNew').addEventListener('click', () => copyLink(inv.token));
+        pageUsers();
+      } catch (err) { toast(errText(err), 'err'); }
+    });
   });
 }

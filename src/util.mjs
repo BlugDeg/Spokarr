@@ -62,3 +62,28 @@ export async function cached(key, ttlMs, fn) {
 }
 export const uncache = (prefix) => { for (const k of cacheMap.keys()) if (k.startsWith(prefix)) cacheMap.delete(k); };
 export const randomId = (bytes = 6) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+// ---------- Reverse proxy ----------
+// X-Forwarded-* headers can be faked by anyone who reaches Spokarr directly. So they are only
+// believed when the request comes from a proxy: TRUST_PROXY=true (always), false (never), or by
+// default ("auto") when the direct peer is a private or loopback address – the usual setup with
+// Nginx Proxy Manager, Traefik, Caddy or SWAG in the same network.
+const PRIVATE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i;
+const peer = (req) => String(req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+export function trustedProxy(req) {
+  const mode = String(process.env.TRUST_PROXY || 'auto').toLowerCase();
+  if (mode === 'true' || mode === '1') return true;
+  if (mode === 'false' || mode === '0') return false;
+  return PRIVATE.test(peer(req));
+}
+/** Address of the visitor – behind a trusted proxy the first entry of X-Forwarded-For. */
+export function clientIp(req) {
+  if (trustedProxy(req)) {
+    const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (fwd) return fwd.replace(/^::ffff:/, '');
+  }
+  return peer(req);
+}
+/** Was the page opened over HTTPS (directly or at the proxy)? */
+export const isHttps = (req) => !!req.socket?.encrypted
+  || (trustedProxy(req) && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');

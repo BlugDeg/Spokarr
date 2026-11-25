@@ -44,7 +44,26 @@ const field = (label, input, hint = '') => `<label class="field"><span>${esc(lab
 const text = (name, value, attrs = '') => `<input name="${name}" value="${esc(value ?? '')}" ${attrs}>`;
 const keyInput = (name, has) => `<input name="${name}" type="password" autocomplete="off" placeholder="${esc(has ? t('settings.keyStored') : '')}">`;
 const toggle = (name, checked, label, hint = '') => `<label class="toggle"><input type="checkbox" name="${name}" ${checked ? 'checked' : ''}><span class="switch"></span><span><b>${esc(label)}</b>${hint ? `<small>${esc(hint)}</small>` : ''}</span></label>`;
-const section = (title, inner, hint = '') => `<section class="panel settings-section"><h2>${esc(title)}</h2>${hint ? `<p class="muted">${esc(hint)}</p>` : ''}${inner}</section>`;
+const logo = (name) => `<img class="svc-logo" src="/icons/${name}.svg" alt="" width="26" height="26">`;
+// A service card: logo, name, on/off switch; switched off it collapses to that one line
+const svcCard = (attrs, logoName, title, pill, enabled, body) => `
+  <section class="panel settings-section client${enabled ? '' : ' off'}" ${attrs}>
+    <div class="indexer-head"><h2>${logo(logoName)}${esc(title)}${pill ? ` <span class="pill">${esc(pill)}</span>` : ''}</h2>${toggle('enabled', enabled, t('settings.indexerEnabled'))}</div>
+    <div class="client-body">${body}</div>
+  </section>`;
+const testFoot = (label = t('settings.test')) => `<div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(label)}</button></div>`;
+const loginFields = (c) => `<div class="grid-2">
+        ${field(t('login.username'), text('username', c.username, 'autocomplete="off"'))}
+        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(c.hasPassword ? t('settings.keyStored') : '')}">`)}
+      </div>`;
+// Opening a switched-off card when it is switched on
+function bindCollapse(root) {
+  root.querySelectorAll('.client').forEach((card) => {
+    const sw = card.querySelector('.indexer-head [name=enabled]');
+    sw?.addEventListener('change', () => card.classList.toggle('off', !sw.checked));
+  });
+}
+const section = (title, inner, hint = '', logoName = '') => `<section class="panel settings-section"><h2${logoName ? ' class="with-logo"' : ''}>${logoName ? logo(logoName) : ''}${esc(title)}</h2>${hint ? `<p class="muted">${esc(hint)}</p>` : ''}${inner}</section>`;
 const saveBar = (extra = '') => `<div class="save-bar">${extra}<span class="test-result" id="testResult"></span><button class="btn btn-primary" type="submit">${esc(t('settings.save'))}</button></div>`;
 function showTest(ok, textValue) {
   const el = document.getElementById('testResult');
@@ -62,24 +81,25 @@ function general() {
   const rows = g.discoverRows || [];
   const genreNames = genres || [];
   return `<form id="f">
-    ${section(t('settings.region'), `
+    ${section(t('settings.region'), `<div class="grid-2">
       ${field(t('settings.region'), `<select name="region">${data.regions.map((r) => `<option value="${r}" ${r === g.region ? 'selected' : ''}>${esc(REGION_NAMES[r] || r)}</option>`).join('')}</select>`, t('settings.regionHint'))}
-      ${field(t('settings.language'), `<select name="contentLanguage"><option value="">–</option>${LANGS.map((l) => `<option value="${l}" ${l === g.contentLanguage ? 'selected' : ''}>${esc(languageName(l))}</option>`).join('')}</select>`, t('settings.languageHint', { lang: languageName(data.effectiveLanguage) }))}`)}
+      ${field(t('settings.language'), `<select name="contentLanguage"><option value="">–</option>${LANGS.map((l) => `<option value="${l}" ${l === g.contentLanguage ? 'selected' : ''}>${esc(languageName(l))}</option>`).join('')}</select>`, t('settings.languageHint', { lang: languageName(data.effectiveLanguage) }))}</div>`)}
     ${section(t('settings.rows'), `
       <div class="row-editor" id="rows">${rows.map(rowEditor).join('')}</div>
       <button type="button" class="btn btn-ghost btn-sm" id="addRow">${icon.plus}${esc(t('settings.addRow'))}</button>`, t('settings.rowsHint'))}
     ${section(t('settings.genres'), `
       ${field(t('settings.genres'), text('discoverGenres', (g.discoverGenres || []).join(', '), 'placeholder="Science Fiction, Krimi" list="genreList"') + `<datalist id="genreList">${(genreNames || []).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>`, t('settings.genresHint'))}
-      ${field(t('settings.genreSort'), `<select name="genreSort">${['popular','hot','new','rating','old','long'].map((k) => `<option value="${k}" ${k === (g.genreSort || 'popular') ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}</select>`, t('settings.genreSortHint'))}
-      ${field(t('settings.rowItems'), text('rowItems', g.rowItems ?? 20, 'type="number" min="10" max="50"'), t('settings.rowItemsHint'))}`)}
+      <div class="grid-2">${field(t('settings.genreSort'), `<select name="genreSort">${['popular','hot','new','rating','old','long'].map((k) => `<option value="${k}" ${k === (g.genreSort || 'popular') ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}</select>`, t('settings.genreSortHint'))}
+      ${field(t('settings.rowItems'), text('rowItems', g.rowItems ?? 20, 'type="number" min="10" max="50"'), t('settings.rowItemsHint'))}</div>`)}
     ${section(t('settings.defaults'), `
       ${toggle('request', g.defaultPermissions.request, t('perm.request'), t('perm.requestHint'))}
       ${toggle('autoApprove', g.defaultPermissions.autoApprove, t('perm.autoApprove'), t('perm.autoApproveHint'))}
       ${toggle('manageRequests', g.defaultPermissions.manageRequests, t('perm.manageRequests'), t('perm.manageRequestsHint'))}`, t('settings.defaultsHint'))}
     ${section(t('settings.abs'), toggle('tagRequester', g.tagRequester, t('settings.tagRequester'), t('settings.tagRequesterHint')))}
     ${section(t('settings.app'), `
-      ${field(t('settings.appUrl'), text('appUrl', g.appUrl, 'type="url" placeholder="https://spokarr.example.com"'), t('settings.appUrlHint'))}
-      ${field(t('settings.stallHours'), text('stallHours', g.stallHours ?? 6, 'type="number" min="1" max="168"'), t('settings.stallHoursHint'))}`)}
+      <div class="grid-2">${field(t('settings.appUrl'), text('appUrl', g.appUrl, 'type="url" placeholder="https://spokarr.example.com"'), t('settings.appUrlHint'))}
+      ${field(t('settings.stallHours'), text('stallHours', g.stallHours ?? 6, 'type="number" min="1" max="168"'), t('settings.stallHoursHint'))}</div>
+      ${toggle('updateCheck', g.updateCheck !== false, t('settings.updateCheck'), t('settings.updateCheckHint'))}`)}
     ${saveBar()}
   </form>`;
 }
@@ -99,7 +119,7 @@ function bindGeneral() {
       try {
         await save({ general: {
           region: f.region.value, contentLanguage: f.contentLanguage.value, tagRequester: f.tagRequester.checked,
-          appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value),
+          appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value), updateCheck: f.updateCheck.checked,
           discoverRows: [...rows.querySelectorAll('.row-edit')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value]))),
           discoverGenres: String(f.discoverGenres.value || '').split(',').map((x) => x.trim()).filter(Boolean),
           genreSort: f.genreSort.value, rowItems: Math.min(50, Math.max(10, Number(f.rowItems.value) || 20)),
@@ -121,7 +141,7 @@ function abs() {
       ${field(t('settings.absPublicUrl'), text('publicUrl', a.publicUrl, 'type="url" placeholder="https://abs.example.com"'), t('settings.absPublicUrlHint'))}
       ${field(t('settings.apiKey'), keyInput('apiKey', a.hasApiKey), t('settings.absKeyHint'))}
       ${field(t('settings.library'), `<select name="libraryId"><option value="">–</option>${libs.filter((l) => l.mediaType === 'book').map((l) => `<option value="${esc(l.id)}" ${l.id === a.libraryId ? 'selected' : ''}>${esc(l.name)}${l.folders?.length ? ' – ' + esc(l.folders.join(', ')) : ''}</option>`).join('')}</select>`, t('settings.libraryHint'))}
-      ${field(t('settings.libraryMount'), text('libraryMount', a.libraryMount, 'placeholder="/audiobooks"'), t('settings.libraryMountHint', { dir: data.libraryDir }))}`)}
+      ${field(t('settings.libraryMount'), text('libraryMount', a.libraryMount, 'placeholder="/audiobooks"'), t('settings.libraryMountHint', { dir: data.libraryDir }))}`, '', 'audiobookshelf')}
     ${saveBar(`<button type="button" class="btn btn-ghost" id="test">${icon.plug}${esc(t('settings.test'))}</button>`)}
   </form>`;
 }
@@ -163,57 +183,39 @@ function downloads() {
   const n = data.nzbget || {};
   const tr = data.transmission || {};
   return `<form id="f">
-    <section class="panel settings-section client" data-client="sab">
-      <div class="indexer-head"><h2>SABnzbd <span class="pill">Usenet</span></h2>${toggle('enabled', s.enabled !== false, t('settings.indexerEnabled'))}</div>
-      ${field(t('settings.sabUrl'), text('url', s.url, 'type="url" placeholder="http://sabnzbd:8080"'))}
-      ${field(t('settings.apiKey'), keyInput('apiKey', s.hasApiKey), t('settings.sabKeyHint'))}
+    ${svcCard('data-client="sab"', 'sabnzbd', 'SABnzbd', 'Usenet', s.enabled !== false, `
+      <div class="grid-2">
+        ${field(t('settings.sabUrl'), text('url', s.url, 'type="url" placeholder="http://sabnzbd:8080"'))}
+        ${field(t('settings.apiKey'), keyInput('apiKey', s.hasApiKey), t('settings.sabKeyHint'))}
+      </div>
       ${field(t('settings.sabCategory'), text('category', s.category, 'placeholder="spokarr"'), t('settings.sabCategoryHint'))}
-      ${pathFields(s)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
-    </section>
-    <section class="panel settings-section client" data-client="nzbget">
-      <div class="indexer-head"><h2>NZBGet <span class="pill">Usenet</span></h2>${toggle('enabled', n.enabled === true, t('settings.indexerEnabled'))}</div>
-      <p class="muted">${esc(t('settings.nzbgetHint'))}</p>
+      ${pathFields(s)}${testFoot()}`)}
+    ${svcCard('data-client="nzbget"', 'nzbget', 'NZBGet', 'Usenet', n.enabled === true, `
+      <p class="muted client-hint">${esc(t('settings.nzbgetHint'))}</p>
       ${field(t('settings.nzbgetUrl'), text('url', n.url, 'type="url" placeholder="http://nzbget:6789"'))}
-      <div class="grid-2">
-        ${field(t('login.username'), text('username', n.username, 'autocomplete="off"'))}
-        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(n.hasPassword ? t('settings.keyStored') : '')}">`)}
-      </div>
+      ${loginFields(n)}
       ${field(t('settings.sabCategory'), text('category', n.category, 'placeholder="spokarr"'), t('settings.nzbgetCategoryHint'))}
-      ${pathFields(n)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
-    </section>
-    <section class="panel settings-section client" data-client="qbit">
-      <div class="indexer-head"><h2>qBittorrent <span class="pill">Torrent</span></h2>${toggle('enabled', q.enabled === true, t('settings.indexerEnabled'))}</div>
+      ${pathFields(n)}${testFoot()}`)}
+    ${svcCard('data-client="qbit"', 'qbittorrent', 'qBittorrent', 'Torrent', q.enabled === true, `
       ${field(t('settings.qbitUrl'), text('url', q.url, 'type="url" placeholder="http://qbittorrent:8080"'), t('settings.qbitUrlHint'))}
-      <div class="grid-2">
-        ${field(t('login.username'), text('username', q.username, 'autocomplete="off"'))}
-        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(q.hasPassword ? t('settings.keyStored') : '')}">`)}
-      </div>
+      ${loginFields(q)}
       ${field(t('settings.sabCategory'), text('category', q.category, 'placeholder="spokarr"'), t('settings.qbitCategoryHint'))}
-      ${pathFields(q)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
-    </section>
-    <section class="panel settings-section client" data-client="transmission">
-      <div class="indexer-head"><h2>Transmission <span class="pill">Torrent</span></h2>${toggle('enabled', tr.enabled === true, t('settings.indexerEnabled'))}</div>
-      <p class="muted">${esc(t('settings.transmissionHint'))}</p>
+      ${pathFields(q)}${testFoot()}`)}
+    ${svcCard('data-client="transmission"', 'transmission', 'Transmission', 'Torrent', tr.enabled === true, `
+      <p class="muted client-hint">${esc(t('settings.transmissionHint'))}</p>
       ${field(t('settings.transmissionUrl'), text('url', tr.url, 'type="url" placeholder="http://transmission:9091"'), t('settings.transmissionUrlHint'))}
-      <div class="grid-2">
-        ${field(t('login.username'), text('username', tr.username, 'autocomplete="off"'))}
-        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(tr.hasPassword ? t('settings.keyStored') : '')}">`)}
-      </div>
+      ${loginFields(tr)}
       <div class="grid-2">
         ${field(t('settings.transmissionLabel'), text('label', tr.label, 'placeholder="spokarr"'), t('settings.transmissionLabelHint'))}
         ${field(t('settings.transmissionDir'), text('downloadDir', tr.downloadDir, 'placeholder="/downloads/audiobooks"'), t('settings.transmissionDirHint'))}
       </div>
-      ${pathFields(tr)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
-    </section>
+      ${pathFields(tr)}${testFoot()}`)}
     ${saveBar()}
   </form>`;
 }
 function bindDownloads() {
   const f = document.getElementById('f');
+  bindCollapse(f);
   const read = (sec) => ({
     enabled: sec.querySelector('[name=enabled]').checked,
     ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.name, i.value])),
@@ -261,16 +263,14 @@ function indexers() {
   const list = data.indexers || [];
   const p = data.prowlarr || {};
   return `<form id="f">
-    <section class="panel settings-section" id="prowlarr">
-      <div class="indexer-head"><h2>Prowlarr</h2>${toggle('enabled', p.enabled === true, t('settings.indexerEnabled'))}</div>
-      <p class="muted">${esc(t('settings.prowlarrHint'))}</p>
+    ${svcCard('id="prowlarr"', 'prowlarr', 'Prowlarr', '', p.enabled === true, `
+      <p class="muted client-hint">${esc(t('settings.prowlarrHint'))}</p>
       <div class="grid-2">
         ${field(t('settings.indexerUrl'), text('url', p.url, 'type="url" placeholder="http://prowlarr:9696"'))}
         ${field(t('settings.apiKey'), keyInput('apiKey', p.hasApiKey), t('settings.prowlarrKeyHint'))}
       </div>
       ${field(t('settings.indexerCategories'), text('categories', p.categories || '3030'), t('settings.indexerCategoriesHint'))}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.test'))}</button></div>
-    </section>
+      ${testFoot()}`)}
     <h2 class="subhead">${esc(t('settings.newznabIndexers'))}</h2>
     <div id="ixList">${list.length ? list.map(indexerCard).join('') : `<p class="muted" id="noIx">${esc(t('settings.noIndexers'))}</p>`}</div>
     <button type="button" class="btn btn-ghost" id="addIx">${icon.plus}${esc(t('settings.addIndexer'))}</button>
@@ -279,6 +279,7 @@ function indexers() {
 }
 function bindIndexers() {
   const f = document.getElementById('f');
+  bindCollapse(f);
   const list = f.querySelector('#ixList');
   const prow = f.querySelector('#prowlarr');
   const readProw = () => ({ enabled: prow.querySelector('[name=enabled]').checked, url: prow.querySelector('[name=url]').value, apiKey: prow.querySelector('[name=apiKey]').value, categories: prow.querySelector('[name=categories]').value });
@@ -327,27 +328,24 @@ function notifications() {
   </fieldset>`;
   return `<form id="f">
     ${section(t('settings.notifyLanguage'), field(t('settings.notifyLanguage'), `<select name="notifyLanguage"><option value="en" ${g.notifyLanguage !== 'de' ? 'selected' : ''}>English</option><option value="de" ${g.notifyLanguage === 'de' ? 'selected' : ''}>Deutsch</option></select>`, t('settings.notifyLanguageHint')))}
-    <section class="panel settings-section agent" data-agent="discord">
-      <div class="indexer-head"><h2>Discord</h2>${toggle('enabled', n.discord.enabled, t('settings.indexerEnabled'))}</div>
+    ${svcCard('data-agent="discord"', 'discord', 'Discord', '', n.discord.enabled, `
       ${field(t('settings.webhook'), `<input name="webhook" type="password" autocomplete="off" placeholder="${esc(n.discord.hasWebhook ? t('settings.keyStored') : 'https://discord.com/api/webhooks/…')}">`, t('settings.webhookHint'))}
       ${events(n.discord)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.sendTest'))}</button></div>
-    </section>
-    <section class="panel settings-section agent" data-agent="ntfy">
-      <div class="indexer-head"><h2>ntfy</h2>${toggle('enabled', n.ntfy.enabled, t('settings.indexerEnabled'))}</div>
+      ${testFoot(t('settings.sendTest'))}`)}
+    ${svcCard('data-agent="ntfy"', 'ntfy', 'ntfy', '', n.ntfy.enabled, `
       <div class="grid-2">
         ${field(t('settings.ntfyServer'), text('server', n.ntfy.server, 'type="url" placeholder="https://ntfy.sh"'))}
         ${field(t('settings.ntfyTopic'), text('topic', n.ntfy.topic, 'placeholder="spokarr-…"'))}
       </div>
       ${field(t('settings.ntfyToken'), `<input name="token" type="password" autocomplete="off" placeholder="${esc(n.ntfy.hasToken ? t('settings.keyStored') : '')}">`, t('settings.ntfyHint'))}
       ${events(n.ntfy)}
-      <div class="indexer-foot"><span class="test-result" data-result></span><button type="button" class="btn btn-ghost btn-sm" data-test>${icon.plug}${esc(t('settings.sendTest'))}</button></div>
-    </section>
+      ${testFoot(t('settings.sendTest'))}`)}
     ${saveBar()}
   </form>`;
 }
 function bindNotifications() {
   const f = document.getElementById('f');
+  bindCollapse(f);
   const read = (sec) => ({
     enabled: sec.querySelector('[name=enabled]').checked,
     ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.name, i.value])),
@@ -371,11 +369,23 @@ function bindNotifications() {
 }
 
 // ---------- About ----------
+const GITHUB = 'https://github.com/BlugDeg';
+const ext = (href, label) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`;
 function about() {
+  const ver = session.status?.version || '';
+  const latest = data.latest;
+  const upd = session.status?.update;
+  const versionInfo = upd
+    ? `${esc(ver)} · <a class="update-inline" href="${esc(upd.url)}" target="_blank" rel="noopener">${esc(t('update.available', { version: upd.version }))}</a>`
+    : `${ext(`${GITHUB}/Spokarr/releases/tag/v${ver}`, ver)}${latest ? ` <span class="muted">· ${esc(t('settings.upToDate'))}</span>` : ''}`;
   return section(t('settings.about'), `<div class="kv plain">
-    <div>${esc(t('settings.version'))}</div><div>${esc(session.status?.version || '')}</div>
+    <div>${esc(t('settings.version'))}</div><div>${versionInfo}</div>
+    <div>${esc(t('settings.createdBy'))}</div><div>${ext(GITHUB, 'BlugDeg')}</div>
+    <div>${esc(t('settings.aiLabel'))}</div><div>${esc(t('settings.aiText'))}</div>
+    <div>${esc(t('settings.source'))}</div><div>${ext(`${GITHUB}/Spokarr`, 'github.com/BlugDeg/Spokarr')} · MIT</div>
+    <div>${esc(t('settings.releases'))}</div><div>${ext(`${GITHUB}/Spokarr/releases`, t('settings.releasesLink'))}</div>
     <div>${esc(t('settings.dataDir'))}</div><div><code>${esc(data.libraryDir)}</code></div>
     <div>Audible</div><div>${esc(REGION_NAMES[data.general.region] || data.general.region)}</div>
-    <div>${esc(t('settings.source'))}</div><div><a href="https://github.com/BlugDeg/Spokarr" target="_blank" rel="noopener">GitHub</a></div>
+    <div>${esc(t('settings.icons'))}</div><div>${ext('https://github.com/homarr-labs/dashboard-icons', 'dashboard-icons')} (Apache-2.0)</div>
   </div>`);
 }

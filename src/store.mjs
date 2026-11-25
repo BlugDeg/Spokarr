@@ -46,6 +46,7 @@ function settingsFromEnv() {
       appUrl: trimUrl(env.APP_URL),
       notifyLanguage: (env.AUDIBLE_REGION || '').toLowerCase() === 'de' ? 'de' : 'en',
       stallHours: 6,
+      updateCheck: env.UPDATE_CHECK !== 'false',
     },
     notifications: {
       discord: { enabled: false, webhook: '', events: ['pending', 'available', 'failed', 'stalled'] },
@@ -103,12 +104,13 @@ function settingsFromEnv() {
   };
 }
 
-export const state = { settings: null, users: [], sessions: {}, requests: [] };
+export const state = { settings: null, users: [], sessions: {}, requests: [], invites: [] };
 export const save = {
   settings: writer('settings.json', () => state.settings),
   users: writer('users.json', () => state.users),
   sessions: writer('sessions.json', () => state.sessions),
   requests: writer('requests.json', () => state.requests),
+  invites: writer('invites.json', () => state.invites),
 };
 
 export async function loadState() {
@@ -135,6 +137,7 @@ export async function loadState() {
   state.users = await readJson('users.json', []);
   state.sessions = await readJson('sessions.json', {});
   state.requests = await readJson('requests.json', []);
+  state.invites = await readJson('invites.json', []);
   // Requests from versions before user accounts belong to the owner
   const owner = state.users.find((u) => u.owner);
   let migrated = false;

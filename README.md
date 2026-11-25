@@ -58,6 +58,9 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 - ✅ **Approval workflow** like Seerr: per-user permissions to request, auto-approve and manage requests.
 - 👥 **User management** with roles, request counts and last sign-in – plus a one-click import of all
   Audiobookshelf users.
+- ✉️ **Invite links**: send a link, the person picks a username and password, and Spokarr creates the
+  account in Audiobookshelf and in Spokarr. Valid for 1, 7 or 30 days, once or several times.
+- 🔄 **Update notice**: admins see at the bottom left when a new release is out (can be switched off).
 - 🧠 **Smart release matching**: every result is scored on title, narrator, language, abridged vs.
   unabridged, dramatizations and size per minute. “View releases” shows the score and the reasons, and
   lets you pick a release by hand.
@@ -200,8 +203,33 @@ path, set the **path mapping** for that client.
 **Categories:** Spokarr searches category `3030` (Audio/Audiobook) by default. Some indexers file
 audiobooks only under `3000` (Audio) – add it if a search finds nothing.
 
-Other people can sign in right away with their Audiobookshelf accounts – or import them all under
-**Users**.
+Other people can sign in right away with their Audiobookshelf accounts – import them all under
+**Users**, or send an **invite link** (**Users → Invite**) to people who have no account yet.
+
+### Reverse proxy and HTTPS
+
+To reach Spokarr from outside your network, put it behind a reverse proxy with HTTPS – for example
+Nginx Proxy Manager, Traefik, Caddy or SWAG – on a **subdomain of its own** (e.g.
+`https://spokarr.example.com`; a sub-path like `/spokarr` is not supported).
+
+- Forward the subdomain to `http://<host>:5057`. No websockets or special headers are needed besides the
+  usual `X-Forwarded-For` and `X-Forwarded-Proto`, which every proxy above sends by default.
+- Set **Settings → General → Spokarr address** to the public address, so links in notifications and
+  invite links point there.
+- Spokarr trusts `X-Forwarded-*` only from private and loopback addresses (`TRUST_PROXY=auto`). Behind
+  HTTPS the session cookie then gets the `Secure` flag, and sign-in limits apply per visitor instead of per
+  proxy. Set `TRUST_PROXY=true` if your proxy has a public address, or `false` to ignore the headers.
+
+Caddy example:
+
+```
+spokarr.example.com {
+    reverse_proxy 192.168.1.10:5057
+}
+```
+
+Nginx Proxy Manager: *Add Proxy Host* → domain `spokarr.example.com`, scheme `http`, forward host and
+port `5057`; on the *SSL* tab request a Let's Encrypt certificate and enable *Force SSL*.
 
 ## Configuration
 
@@ -213,6 +241,8 @@ Everything is configured in the web interface and stored in `data/settings.json`
 | `DATA_DIR` | Folder for settings, users and requests (default `/data`) |
 | `LIBRARY_DIR` | Folder where finished audiobooks are placed (default `/audiobooks`) |
 | `PUID`, `PGID` | User and group Spokarr runs as (default `1000`; Unraid `99`/`100`). The data folder is handed to this user on start |
+| `TRUST_PROXY` | `auto` (default): believe `X-Forwarded-*` from private addresses; `true` / `false` |
+| `UPDATE_CHECK` | `false` turns off the check for new releases (one request to the GitHub API twice a day) |
 
 All other variables in [`.env.example`](.env.example) are optional and only read on the very first start
 to pre-fill the settings – handy for automated deployments.
@@ -250,7 +280,13 @@ A release is picked automatically at 50 points or more. Everything else can be c
   `HttpOnly`, `SameSite=Lax` cookie; only their hashes are saved.
 - Failed sign-ins are rate-limited (8 attempts per 15 minutes and IP).
 - API keys are stored in `data/settings.json` with file mode `600` and never sent to the browser.
-- Put Spokarr behind HTTPS (e.g. a reverse proxy) if you expose it to the internet.
+- Put Spokarr behind HTTPS (see [Reverse proxy and HTTPS](#reverse-proxy-and-https)) if you expose it to
+  the internet.
+- Invite links contain a random 192-bit token, expire after 1–30 days and can be limited to one use.
+  Creating accounts needs the Audiobookshelf API key of an admin – the key Spokarr creates during setup
+  has these rights. Sign-ups are limited to 10 per hour and IP.
+- The only outside requests besides Audible, your indexers and download clients are the optional update
+  check (GitHub API) and nothing else – no analytics, no fonts or scripts from other servers.
 
 ## Contributing
 
@@ -269,6 +305,11 @@ Spokarr is a search and automation tool. It does not host, index or provide any 
 responsible for complying with the laws of your country and the terms of the services you connect.
 Audible is a trademark of Audible, Inc. Spokarr is not affiliated with Audible, Amazon or
 Audiobookshelf. Covers in the screenshots are shown for illustration and belong to their publishers.
+Service icons from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) (Apache-2.0); the
+logos are trademarks of their projects.
+
+Spokarr was created by [BlugDeg](https://github.com/BlugDeg) and built with the help of an AI coding
+assistant (Claude by Anthropic).
 
 ## License
 

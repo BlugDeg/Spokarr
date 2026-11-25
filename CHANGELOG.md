@@ -3,6 +3,29 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] – 2026-11-25
+
+### Added
+- **Invite links** (Users → Invite): the person opens the link, picks a username and password, and
+  Spokarr creates the account in Audiobookshelf and in Spokarr with the default permissions, then signs
+  them in. Valid for 1, 7 or 30 days, once, 5×, 10× or unlimited; list with use count, copy and delete.
+- **Update notice**: admins see "Update available" at the bottom left, linking to the release notes; the
+  version number links to its release. Checks the GitHub API twice a day, can be switched off
+  (Settings → General, or `UPDATE_CHECK=false`).
+- **Reverse proxy support**: `TRUST_PROXY` (default `auto`: trust `X-Forwarded-*` from private addresses).
+  Behind HTTPS the session cookie is marked `Secure`; sign-in limits count per visitor. README section with
+  Nginx Proxy Manager and Caddy examples.
+- About page: author, AI disclosure, releases, icon credits.
+
+### Changed
+- Language switch EN | DE instead of a dropdown, also on the sign-in page.
+- Settings are more compact: service logos, switched-off services collapse to one line, fields side by
+  side where it fits.
+
+### Fixed
+- Hidden checkboxes of disabled switches showed up at the right edge of the window (user dialog).
+- `X-Forwarded-For` was trusted from anyone, so the sign-in limit could be bypassed by sending the header.
+
 ## [0.7.0] – 2026-11-25
 
 ### Added

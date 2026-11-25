@@ -1,7 +1,7 @@
 // Spokarr – app shell and router
-import { LANGUAGES, lang, setLang, t } from './i18n.js';
-import { api, avatar, empty, errText, esc, icon, post, view } from './lib.js';
-import { renderLogin } from './pages/auth.js';
+import { lang, setLang, t } from './i18n.js';
+import { api, avatar, empty, errText, esc, icon, langSwitch, post, toast, view } from './lib.js';
+import { renderInvite, renderLogin } from './pages/auth.js';
 import { pageBook, stopBook } from './pages/book.js';
 import { pageDiscover, pageRow, pageSearch } from './pages/catalog.js';
 import { pageRequests, stopRequests } from './pages/requests.js';
@@ -20,17 +20,24 @@ function setActive(name) {
 function applyStaticTexts() {
   document.querySelectorAll('[data-i18n]').forEach((el) => (el.textContent = t(el.dataset.i18n)));
   searchInput.placeholder = t('search.placeholder');
-  document.querySelectorAll('.lang-select').forEach((s) => (s.value = lang));
-  document.querySelectorAll('.lang-code').forEach((el) => (el.textContent = lang.toUpperCase()));
+  renderLangSwitches();
 }
-function setupLanguageSelect() {
-  const options = Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
-  document.querySelectorAll('.lang-select').forEach((s) => {
-    s.innerHTML = options;
-    s.value = lang;
-    s.addEventListener('change', () => { setLang(s.value); applyStaticTexts(); renderUserChip(); start(); });
-  });
+function renderLangSwitches() {
+  document.querySelectorAll('.lang-switch').forEach((el) => (el.innerHTML = langSwitch()));
 }
+function changeLang(code) {
+  if (code === lang) return;
+  setLang(code);
+  applyStaticTexts();
+  renderUserChip();
+  if (session.user) { renderUpdate(); route(); } else start();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.lang-switch [data-lang]');
+  if (!b) return;
+  changeLang(b.dataset.lang);
+  b.closest('.sheet-back')?.remove();
+});
 
 function renderUserChip() {
   const u = session.user;
@@ -58,14 +65,15 @@ function moreMenu() {
     <div class="sheet-user">${avatar(u.username, 'lg')}<div><b>${esc(u.username)}</b><small>${esc(u.owner ? t('users.role.owner') : t('users.role.' + u.role))}</small></div></div>
     ${session.config.absUrl ? `<a href="${esc(session.config.absUrl)}" target="_blank" rel="noopener">${icon.play}${esc(t('nav.audiobookshelf'))}</a>` : ''}
     ${isAdmin() ? `<a href="#/users">${icon.book}${esc(t('nav.users'))}</a><a href="#/settings">${icon.edit}${esc(t('nav.settings'))}</a>` : ''}
-    <label class="sheet-lang">${esc(t('lang.label'))}<select class="lang-select-sheet">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === lang ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <div class="sheet-lang"><span>${esc(t('lang.label'))}</span><div class="lang-switch" role="group" aria-label="Language">${langSwitch()}</div></div>
     <button id="sheetLogout">${icon.logout}${esc(t('nav.signOut'))}</button>
   </div>`;
   back.addEventListener('click', (e) => { if (e.target === back || e.target.closest('a')) back.remove(); });
   back.querySelector('#sheetLogout').addEventListener('click', () => { back.remove(); signOut(); });
-  back.querySelector('.lang-select-sheet').addEventListener('change', (e) => { setLang(e.target.value); applyStaticTexts(); back.remove(); renderUserChip(); route(); });
   document.body.append(back);
 }
+
+function toastSignedIn() { toast(t('invite.alreadySignedIn')); }
 
 // ---------- Router ----------
 async function route() {
@@ -90,6 +98,7 @@ async function route() {
       await pageSearch(sp.get('q') || '', sp.get('genre') || '', sp.get('sort') || '');
     }
     else if ((m = h.match(/^\/book\/([A-Z0-9]{10})$/))) { setActive(''); await pageBook(m[1]); }
+    else if (h.startsWith('/invite/')) { toastSignedIn(); location.hash = '#/'; }
     else if (h === '/requests') { setActive('requests'); await pageRequests(); }
     else if (h === '/users' && isAdmin()) { setActive('users'); await pageUsers(); }
     else if ((m = h.match(/^\/settings(?:\/(\w+))?$/)) && isAdmin()) { setActive('settings'); await pageSettings(m[1]); }
@@ -99,13 +108,27 @@ async function route() {
   }
 }
 
+// Version in the sidebar links to its release notes; a newer release shows a badge
+const RELEASES = 'https://github.com/BlugDeg/Spokarr/releases';
+function renderUpdate() {
+  const st = session.status || {};
+  document.querySelectorAll('.version').forEach((el) => { el.textContent = 'v' + st.version; el.href = `${RELEASES}/tag/v${st.version}`; });
+  document.querySelectorAll('.update-badge').forEach((el) => {
+    const u = st.update;
+    el.hidden = !u;
+    if (u) { el.href = u.url; el.innerHTML = `${icon.download}<span>${esc(t('update.available', { version: u.version }))}</span>`; }
+  });
+}
+
 async function start() {
   session.status = await api('/api/status').catch(() => ({ setupRequired: false }));
   session.user = session.status.user || null;
   if (!session.user) {
     app.hidden = true;
     authRoot.hidden = false;
-    renderLogin(authRoot, start);
+    const inv = location.hash.match(/^#\/invite\/([a-f0-9]{48})$/);
+    if (inv && !session.status.setupRequired) renderInvite(authRoot, inv[1], start);
+    else renderLogin(authRoot, start);
     return;
   }
   session.config = await api('/api/config').catch(() => ({}));
@@ -113,7 +136,7 @@ async function start() {
   authRoot.innerHTML = '';
   app.hidden = false;
   renderUserChip();
-  document.querySelectorAll('.version').forEach((el) => (el.textContent = 'v' + session.status.version));
+  renderUpdate();
   route();
 }
 
@@ -130,9 +153,8 @@ searchInput.addEventListener('input', () => {
   typing = setTimeout(() => { location.hash = '#/search?q=' + encodeURIComponent(q); }, 600);
 });
 document.getElementById('moreBtn').addEventListener('click', moreMenu);
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => (session.user ? route() : start()));
 window.addEventListener('spokarr:signedout', () => { if (session.user) { session.user = null; start(); } });
 
-setupLanguageSelect();
 applyStaticTexts();
 start();

@@ -66,6 +66,38 @@ export async function absUsers() {
   return (d.users || []).map((u) => ({ id: u.id, username: u.username, type: u.type, isActive: u.isActive !== false }));
 }
 
+/**
+ * Creates a normal Audiobookshelf user (invite links). Needs an API key of an ABS admin – the key
+ * Spokarr creates during the first setup belongs to the owner and has these rights.
+ */
+export async function absCreateUser(username, password) {
+  if (!absEnabled()) throw new UserError('abs_not_configured', {}, 503);
+  let r;
+  try {
+    r = await fetch(`${trimUrl(cfg().url)}/api/users`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({
+        username, password, type: 'user', isActive: true,
+        permissions: { download: true, update: false, delete: false, upload: false, accessAllLibraries: true, accessAllTags: true, accessExplicitContent: true },
+        librariesAccessible: [], itemTagsSelected: [],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new UserError('abs_unreachable', { url: cfg().url }, 503);
+  }
+  const body = await r.text();
+  if (r.status === 401 || r.status === 403) throw new UserError('abs_no_admin', {}, 502);
+  if (!r.ok) {
+    if (/taken|exists/i.test(body)) throw new UserError('invite_username_taken', {}, 409);
+    throw new UserError('abs_error', { status: r.status }, 502);
+  }
+  let d = {};
+  try { d = JSON.parse(body); } catch { /* checked below */ }
+  if (!d.user?.id) throw new UserError('abs_error', { status: 'no user' }, 502);
+  return { id: d.user.id, username: d.user.username, type: d.user.type };
+}
+
 async function libraryId() {
   if (cfg().libraryId) return cfg().libraryId;
   const lib = (await absLibraries()).find((l) => l.mediaType === 'book');
