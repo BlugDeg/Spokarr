@@ -18,6 +18,8 @@ export function openManualRequest(prefill = {}) {
         <label class="field"><span>${esc(t('manual.language'))}</span><select name="language"><option value="">${esc(t('manual.languageDefault'))}</option>${LANGS.map((l) => `<option value="${l}">${esc(languageName(l))}</option>`).join('')}</select></label>
         <label class="field"><span>${esc(t('manual.year'))}</span><input name="year" inputmode="numeric" maxlength="4" placeholder="1995"></label>
       </div>
+      <label class="field"><span>${esc(t('manual.kind'))}</span><select name="kind">
+        <option value="reading">${esc(t('manual.kindReading'))}</option><option value="drama">${esc(t('manual.kindDrama'))}</option></select></label>
       <label class="toggle"><input type="checkbox" name="abridged"><span class="switch"></span><span><b>${esc(t('book.abridged'))}</b><small>${esc(t('manual.abridgedHint'))}</small></span></label>
       <label class="field"><span>${esc(t('manual.note'))}</span><input name="note" maxlength="500" placeholder="${esc(t('manual.notePlaceholder'))}"></label>
       <div class="modal-actions"><button type="submit" class="btn btn-primary">${icon.plus}${esc(t('book.request'))}</button></div>
@@ -33,7 +35,7 @@ export function openManualRequest(prefill = {}) {
         const r = await post('/api/requests/manual', {
           title: f.title.value, author: f.author.value, narrator: f.narrator.value,
           requireNarrator: f.requireNarrator.checked, language: f.language.value, year: f.year.value,
-          abridged: f.abridged.checked, note: f.note.value,
+          abridged: f.abridged.checked, note: f.note.value, kind: f.kind.value,
         });
         m.remove();
         const ok = r.status === 'downloading' || r.status === 'pending';

@@ -120,9 +120,15 @@ export function scoreRelease(book, rel) {
   let s = Math.round(hit * 60);
   if (hit < 0.75) minus.push('title_mismatch');
 
-  const narrWords = book.narrators.flatMap((x) => norm(x).split(' ')).filter((w) => w.length > 2);
-  if (narrWords.length && narrWords.some((w) => words.has(w))) { s += 25; plus.push('narrator'); }
   const authWords = book.authors.flatMap((x) => norm(x).split(' ')).filter((w) => w.length > 2);
+  const narrWords = book.narrators.flatMap((x) => norm(x).split(' ')).filter((w) => w.length > 2);
+  // Words the narrator shares with the author ("Michael Ende" reading "Momo") are in almost every
+  // release name, so they prove nothing. An author reading their own book only counts with an
+  // explicit "read by" / "gelesen von" / "Autorenlesung".
+  const ownNarr = narrWords.filter((w) => !authWords.includes(w));
+  const readMarker = /\b(read by|narrated by|gelesen von|gesprochen von|autorenlesung|liest)\b/.test(n);
+  const narratorHit = ownNarr.length ? ownNarr.some((w) => words.has(w)) : narrWords.length > 0 && readMarker && narrWords.some((w) => words.has(w));
+  if (narratorHit) { s += 25; plus.push('narrator'); }
   if (authWords.some((w) => words.has(w))) s += 5;
 
   // Language: bonus when the release names the book's language, penalty when it names another one
@@ -132,8 +138,11 @@ export function scoreRelease(book, rel) {
   if (named.includes(bookLang)) { s += 10; plus.push('language'); }
   else if ((bookLang !== 'english' && looksEnglish) || named.some((l) => l !== bookLang)) { s -= 50; minus.push('wrong_language'); }
 
-  const isDrama = (t) => /\bhoerspiel\b|full cast|dramati[sz](?:ed|ation)|audio drama|radio (?:drama|play|adapt\w*)|\bbbc radio\b/.test(t);
-  if (isDrama(n) && !isDrama(norm(book.title + ' ' + book.subtitle))) { s -= 30; minus.push('drama'); }
+  const isDrama = (t) => /\bh(?:oe|o)?rspiel\b|\bhoorspel\b|full cast|dramati[sz](?:ed|ation)|audio drama|radio (?:drama|play|adapt\w*)|\bbbc radio\b/.test(t);
+  const wantDrama = book.drama === true || isDrama(norm(book.title + ' ' + book.subtitle));
+  if (isDrama(n) && !wantDrama) { s -= 30; minus.push('drama'); }
+  // A manual request for a radio play: readings are shown, but the play is preferred
+  if (book.drama === true) { if (isDrama(n)) { s += 15; plus.push('drama'); } else { s -= 20; minus.push('not_drama'); } }
   const unabr = /\bungekuerzt\b|\bunabridged\b/.test(n);
   const abr = !unabr && /\bgekuerzt\b|\babridged\b/.test(n);
   if (unabr && !book.abridged) { s += 5; plus.push('unabridged'); }

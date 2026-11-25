@@ -75,7 +75,7 @@ function render(b) {
     <div class="detail-inner">
       <img class="detail-cover" src="${esc(coverOf(b, false))}" alt="">
       <div class="detail-info">
-        <div class="badges">${badge(st)}${b.manual ? `<span class="badge b-manual">${esc(t('manual.badge'))}</span>` : ''}<span class="badge b-type">${esc(edition)}</span>${b.language ? `<span class="badge b-type">${esc(languageName(b.language))}</span>` : ''}</div>
+        <div class="badges">${badge(st)}${b.manual ? `<span class="badge b-manual">${esc(t('manual.badge'))}</span>` : ''}${b.drama ? `<span class="badge b-type">${esc(t('manual.kindDrama'))}</span>` : ''}<span class="badge b-type">${esc(edition)}</span>${b.language ? `<span class="badge b-type">${esc(languageName(b.language))}</span>` : ''}</div>
         <h1>${esc(b.title)}</h1>
         ${b.subtitle ? `<div class="sub">${esc(b.subtitle)}</div>` : ''}
         <div class="facts">

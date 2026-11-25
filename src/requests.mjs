@@ -102,6 +102,7 @@ function manualBook(input) {
     asin: 'M' + randomId(5).toUpperCase().slice(0, 9).padEnd(9, '0'), manual: true,
     title, subtitle: '', authors: [author], narrators: narrator ? [narrator] : [],
     requireNarrator: !!narrator && input.requireNarrator !== false,
+    drama: input.kind === 'drama',
     minutes: 0, abridged: input.abridged === true, release: year ? `${year}-01-01` : '', series: [],
     cover: '', coverSmall: '', language: LANGS.includes(input.language) ? input.language : contentLanguage(),
     publisher: '', summary: clean(input.note, 500), genres: [], rating: null,
@@ -112,7 +113,7 @@ function manualBook(input) {
 export async function createManualRequest(user, input = {}) {
   if (!user.permissions.request && user.role !== 'admin') throw new UserError('forbidden', {}, 403);
   const book = manualBook(input);
-  const key = (b) => [b.title, b.authors[0], b.narrators[0] || '', b.abridged].map((x) => norm(String(x))).join('|');
+  const key = (b) => [b.title, b.authors[0], b.narrators[0] || '', b.abridged, !!b.drama].map((x) => norm(String(x))).join('|');
   const same = state.requests.find((r) => r.book?.manual && key(r.book) === key(book));
   if (same && !['declined', 'not_found', 'failed'].includes(same.status)) throw new UserError('already_requested', {}, 409);
   if (same) Object.assign(book, { asin: same.asin });
