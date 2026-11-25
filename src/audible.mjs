@@ -135,11 +135,15 @@ export async function categoryIndex() {
       const d = await audibleFetch(catUrl(), { headers: { Accept: 'application/json' } });
       const all = (d.categories || []).map((c) => ({ id: c.id, name: c.name, depth: 0, path: c.name }));
       let level = all.slice();
+      // Counted, not swallowed silently: a throttled build would otherwise be written to disk as a
+      // snapshot with branches missing and stay there for 24 h.
+      let failed = 0;
       for (let depth = 1; depth <= 3; depth++) {
         const next = [];
         for (let i = 0; i < level.length; i += 6) {
           const batch = level.slice(i, i + 6);
-          const res = await Promise.all(batch.map((n) => audibleFetch(catUrl(`/${n.id}`), { headers: { Accept: 'application/json' } }).catch(() => ({}))));
+          const res = await Promise.all(batch.map((n) => audibleFetch(catUrl(`/${n.id}`), { headers: { Accept: 'application/json' } })
+            .catch(() => { failed++; return {}; })));
           res.forEach((r, j) => {
             for (const k of ((r.category || {}).children || [])) {
               const node = { id: k.id, name: k.name, depth, path: `${batch[j].path} > ${k.name}` };
@@ -151,6 +155,7 @@ export async function categoryIndex() {
         level = next;
         if (!level.length) break;
       }
+      all.failed = failed;
       return all;
     });
   } catch (e) {
@@ -159,6 +164,11 @@ export async function categoryIndex() {
       return disk.items;
     }
     throw e;
+  }
+  // Only a complete tree becomes the new snapshot - a throttled one keeps the previous file.
+  if (items.failed) {
+    log(`Category tree incomplete (${items.failed} requests failed), snapshot of ${disk ? new Date(disk.at).toISOString() : 'none'} kept`);
+    return items;
   }
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });

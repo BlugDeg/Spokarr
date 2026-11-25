@@ -34,9 +34,11 @@ export async function pageDiscover(sort = '') {
       <div class="row-head"><h2>${esc(r.title || t('row.' + r.id))}<span class="row-count">${r.items.length}</span></h2></div>
       <div class="scroller">${r.items.map(card).join('')}</div>
     </section>`).join('');
-  v.innerHTML = `<div class="sortbar">${sortField(current, 'data-discover-sort')}</div>` +
+  // The sort control only applies to the genre rows - "Popular" and "New releases" are fixed rows,
+  // so on an installation without genres it would be a control that does nothing.
+  v.innerHTML = ((cfg.genres || []).length ? `<div class="sortbar">${sortField(current, 'data-discover-sort')}</div>` : '') +
     chipBar(cfg.genres || []) + (body || empty(icon.warn, t('discover.unavailable')));
-  v.querySelector('[data-discover-sort]').addEventListener('change', (e) => {
+  v.querySelector('[data-discover-sort]')?.addEventListener('change', (e) => {
     const s = e.target.value;
     location.hash = s === 'popular' ? '#/' : '#/?sort=' + encodeURIComponent(s);
   });

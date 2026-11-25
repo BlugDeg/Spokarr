@@ -20,9 +20,13 @@ export async function pageSettings(tab = 'general') {
     <nav class="tabs">${TABS.map((k) => `<a href="#/settings/${k}" class="${k === tab ? 'on' : ''}">${esc(t('settings.' + k))}</a>`).join('')}</nav>
     <div class="settings-body">${({ general, abs, downloads, indexers, notifications, about })[tab]()}</div>`;
   ({ general: bindGeneral, abs: bindAbs, downloads: bindDownloads, indexers: bindIndexers, notifications: bindNotifications, about: () => {} })[tab]();
-  // The genre list costs a full category-tree build on a cold start (~45 s) - never wait for it
-  // before the page is visible, the datalist is filled afterwards.
-  if (!genres) fillGenres();
+  // The genre list costs a full category-tree build on a cold start (~45 s), which a plain
+  // installation would pay once a day for nothing. So it is only fetched when the field is used.
+  // Delegated on the container (focusin bubbles, focus does not), so it survives a re-render and
+  // does not sit on a node that may already have been replaced.
+  v.addEventListener('focusin', (e) => {
+    if (e.target?.name === 'discoverGenres' && !genres) fillGenres();
+  });
 }
 
 async function fillGenres() {
