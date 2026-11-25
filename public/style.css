@@ -383,3 +383,9 @@ details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
 /* v0.4: notifications, stalled */
 .b-stalled { background: #f97316; color: #2a1200; }
 .events { margin-top: 6px; }
+
+/* Sorting on discover and in genre search (same look as the settings) */
+.sortbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 0 0 18px; }
+.sortbar .field { margin: 0; min-width: 230px; max-width: 300px; }
+.row-count { color: var(--dim); font-size: 13px; font-weight: 400; margin-left: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }

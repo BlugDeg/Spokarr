@@ -76,8 +76,15 @@ async function route() {
   window.scrollTo(0, 0);
   try {
     let m;
-    if (h === '/') { setActive('discover'); await pageDiscover(); }
-    else if ((m = h.match(/^\/search(?:\?q=(.*))?$/))) { setActive('search'); await pageSearch(decodeURIComponent(m[1] || '')); }
+    if ((m = h.match(/^\/?(?:\?(.*))?$/))) {
+      setActive('discover');
+      await pageDiscover(new URLSearchParams(m[1] || '').get('sort') || '');
+    }
+    else if ((m = h.match(/^\/search(?:\?(.*))?$/))) {
+      setActive('search');
+      const sp = new URLSearchParams(m[1] || '');
+      await pageSearch(sp.get('q') || '', sp.get('genre') || '', sp.get('sort') || '');
+    }
     else if ((m = h.match(/^\/book\/([A-Z0-9]{10})$/))) { setActive(''); await pageBook(m[1]); }
     else if (h === '/requests') { setActive('requests'); await pageRequests(); }
     else if (h === '/users' && isAdmin()) { setActive('users'); await pageUsers(); }

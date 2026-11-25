@@ -5,7 +5,7 @@ import fss from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { absEnabled, absLibraries, absStatus, absUsers } from './src/abs.mjs';
-import { contentLanguage, discoverRows, getBook, REGIONS, searchAudible } from './src/audible.mjs';
+import { browseGenre, categoryIndex, contentLanguage, discoverRows, genreNames, getBook, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
 import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired } from './src/auth.mjs';
 import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
@@ -23,6 +23,21 @@ const PORT = Number(process.env.PORT || 5057);
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
 
 // ---------- Helpers ----------
+/**
+ * Build the category index in the background. It costs a few hundred Audible requests, so it only
+ * runs when genres are actually configured - a plain installation never asks for the tree. A genre
+ * search or the settings picker builds it on demand anyway.
+ */
+async function warmGenres(tries = 0) {
+  if (!(state.settings.general.discoverGenres || []).length) return;
+  try {
+    await categoryIndex();
+  } catch (e) {
+    log('genre tree could not be loaded:', e.message);
+    if (tries < 12) setTimeout(() => warmGenres(tries + 1), 10 * 60e3);
+  }
+}
+
 async function annotate(books) {
   const st = await statusResolver();
   return books.map((b) => ({ ...b, status: st(b) }));
@@ -56,6 +71,12 @@ function applySettings(body) {
         .map((r) => ({ title: String(r.title || '').trim(), keywords: String(r.keywords || '').trim(), narrator: String(r.narrator || '').trim() }))
         .filter((r) => r.title).slice(0, 12);
     }
+    if (g.discoverGenres !== undefined) {
+      const list = Array.isArray(g.discoverGenres) ? g.discoverGenres : String(g.discoverGenres || '').split(/[;,]/);
+      s.general.discoverGenres = list.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 12);
+    }
+    if (g.genreSort !== undefined) s.general.genreSort = SORTS[g.genreSort] ? g.genreSort : 'popular';
+    if (g.rowItems !== undefined) s.general.rowItems = Math.min(50, Math.max(10, Number(g.rowItems) || 20));
     if (g.defaultPermissions) {
       s.general.defaultPermissions = {
         request: bool(g.defaultPermissions.request), autoApprove: bool(g.defaultPermissions.autoApprove),
@@ -198,18 +219,23 @@ route('POST', '/api/auth/login', PUBLIC_ROUTE, async ({ req, res, body }) => ({ 
 route('POST', '/api/auth/logout', PUBLIC_ROUTE, async ({ req, res }) => { await logout(req, res); return { ok: true }; });
 
 // ---------- Catalog ----------
+route('GET', '/api/genres', USER, () => genreNames());
 route('GET', '/api/config', USER, () => ({
   region: state.settings.general.region, absUrl: state.settings.abs.publicUrl || state.settings.abs.url, absEnabled: absEnabled(),
+  genres: state.settings.general.discoverGenres || [], genreSort: state.settings.general.genreSort || 'popular',
 }));
-route('GET', '/api/discover', USER, async () => {
-  const rows = await discoverRows();
+route('GET', '/api/discover', USER, async ({ url }) => {
+  const rows = await discoverRows((url.searchParams.get('sort') || '').trim());
   return Promise.all(rows.map(async (r) => ({ ...r, items: await annotate(r.items) })));
 });
 route('GET', '/api/search', USER, async ({ url }) => {
   const q = (url.searchParams.get('q') || '').trim();
-  if (!q) return [];
-  const items = await cached(`search:${state.settings.general.region}:${q.toLowerCase()}`, 10 * 60e3,
-    () => searchAudible({ keywords: q, products_sort_by: 'Relevance', num_results: 40 }));
+  const genre = (url.searchParams.get('genre') || '').trim();
+  const sort = (url.searchParams.get('sort') || 'popular').trim();
+  const limit = Math.min(250, Math.max(20, Number(url.searchParams.get('limit')) || 100));
+  if (!q && !genre) return [];
+  const items = await cached(`search:${state.settings.general.region}:${q.toLowerCase()}:${genre.toLowerCase()}:${sort}:${limit}`, 10 * 60e3,
+    () => (genre ? browseGenre(genre, { q, sort, limit }) : searchAudible({ keywords: q, products_sort_by: 'Relevance', num_results: 40 })));
   return annotate(items);
 });
 route('GET', /^\/api\/book\/([A-Z0-9]{10})$/, USER, async ({ m, user }) => {
@@ -291,6 +317,8 @@ route('GET', '/api/settings', ADMIN, () => ({ ...mask(state.settings), regions: 
 route('PUT', '/api/settings', ADMIN, async ({ body }) => {
   applySettings(body);
   await save.settings();
+  // Genres just switched on? Fetch the tree in the background instead of on the first page view.
+  if ((state.settings.general.discoverGenres || []).length) setTimeout(() => warmGenres(), 500);
   return { ...mask(state.settings), regions: Object.keys(REGIONS), effectiveLanguage: contentLanguage(), events: EVENTS };
 });
 route('POST', '/api/settings/test/abs', ADMIN, async ({ body }) => {
@@ -375,6 +403,8 @@ const server = http.createServer(async (req, res) => {
 await loadState();
 server.listen(PORT, () => {
   log(`Spokarr ${VERSION} listening on port ${PORT} (Audible ${state.settings.general.region}, language ${contentLanguage()})`);
+  // Only warm up when genres are in use - see warmGenres().
+  if ((state.settings.general.discoverGenres || []).length) setTimeout(() => warmGenres(), 4000);
   if (setupRequired()) log('Setup required: open the web interface and sign in with an Audiobookshelf admin account');
 });
 setInterval(poll, 15000);

@@ -40,12 +40,25 @@ export async function fetchJson(url, opts = {}, timeout = 20000) {
 }
 
 const cacheMap = new Map();
+// Calls that are still running, per key. Without this, two callers that hit a cold cache at the same
+// time build the same thing twice - measured on a cold start: 1128 category requests instead of 564.
+const pending = new Map();
 export async function cached(key, ttlMs, fn) {
   const hit = cacheMap.get(key);
   if (hit && hit.until > Date.now()) return hit.value;
-  const value = await fn();
-  cacheMap.set(key, { value, until: Date.now() + ttlMs });
-  return value;
+  const running = pending.get(key);
+  if (running) return running;
+  const p = (async () => {
+    try {
+      const value = await fn();
+      cacheMap.set(key, { value, until: Date.now() + ttlMs });
+      return value;
+    } finally {
+      pending.delete(key);
+    }
+  })();
+  pending.set(key, p);
+  return p;
 }
 export const uncache = (prefix) => { for (const k of cacheMap.keys()) if (k.startsWith(prefix)) cacheMap.delete(k); };
 export const randomId = (bytes = 6) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
