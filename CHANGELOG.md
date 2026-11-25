@@ -3,6 +3,15 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] – 2026-11-25
+
+### Fixed
+- A different book with the same title was shown as already in the library (e.g. *Erlösung* by
+  Dalzelle vs. Hamilton). The title fallback now also requires the author and only applies to library
+  items without ASIN; the author is taken from the folder name if ABS has none. Thanks @TheLord83 (#5, #2)
+- Audible answered `503` for minutes after a burst of catalog requests. At most three requests run at
+  once now, with retries and backoff on `429`/`502`/`503`. Thanks @TheLord83 (#7)
+
 ## [0.5.1] – 2026-11-24
 
 ### Fixed
