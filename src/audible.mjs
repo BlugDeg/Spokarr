@@ -1,6 +1,6 @@
 // Audible catalog (public API, no account needed)
 import { state } from './store.mjs';
-import { cached, fetchJson, norm, stripHtml, UserError } from './util.mjs';
+import { cached, fetchJson, log, norm, stripHtml, UserError } from './util.mjs';
 
 export const REGIONS = {
   us: { host: 'api.audible.com', abs: 'audible', lang: 'english' },
@@ -21,10 +21,45 @@ const base = () => `https://${region().host}/1.0/catalog/products`;
 const RG = 'contributors,media,product_attrs,product_desc,product_extended_attrs,series,rating';
 const BOOK_TYPES = new Set(['SinglePartBook', 'MultiPartBook']);
 
+// Audible throttles hard: a handful of parallel requests is enough to make it answer 503 for
+// minutes, on every endpoint. So at most three requests in flight, 120 ms apart, and up to four
+// attempts with growing backoff on 502/503/429.
+const MAX_PARALLEL = 3;
+const GAP_MS = 120;
+const RETRY_STATUS = [429, 502, 503];
+let inFlight = 0;
+
+async function limited(fn) {
+  while (inFlight >= MAX_PARALLEL) await new Promise((r) => setTimeout(r, 50));
+  inFlight++;
+  try {
+    const v = await fn();
+    await new Promise((r) => setTimeout(r, GAP_MS));
+    return v;
+  } finally {
+    inFlight--;
+  }
+}
+
+async function audibleFetch(url, opts = {}, timeout = 20000) {
+  let last;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 900 * 2 ** (attempt - 1)));
+    try {
+      return await limited(() => fetchJson(url, opts, timeout));
+    } catch (e) {
+      last = e;
+      if (!RETRY_STATUS.includes(e.status)) throw e;
+      log(`Audible answered ${e.status}, attempt ${attempt + 1}`);
+    }
+  }
+  throw last;
+}
+
 async function audible(params) {
   const u = new URL(base());
   for (const [k, v] of Object.entries({ response_groups: RG, image_sizes: '500,1024', num_results: 30, ...params })) u.searchParams.set(k, v);
-  return fetchJson(u, { headers: { Accept: 'application/json' } });
+  return audibleFetch(u, { headers: { Accept: 'application/json' } });
 }
 export function mapProduct(p) {
   return {
@@ -59,7 +94,7 @@ export async function getBook(asin) {
     const u = new URL(`${base()}/${encodeURIComponent(asin)}`);
     u.searchParams.set('response_groups', RG);
     u.searchParams.set('image_sizes', '500,1024');
-    const d = await fetchJson(u, { headers: { Accept: 'application/json' } }).catch((e) => {
+    const d = await audibleFetch(u, { headers: { Accept: 'application/json' } }).catch((e) => {
       if (e.status === 404) throw new UserError('book_not_found', {}, 404);
       throw e;
     });
