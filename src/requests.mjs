@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import { absAddTags, absEnabled, absImproveChapters, absItems, absMatch, absScan } from './abs.mjs';
-import { getBook, region } from './audible.mjs';
+import { contentLanguage, getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
 import { CLIENT_NAMES, clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
 import { notify } from './notify.mjs';
@@ -76,10 +76,56 @@ async function startDownload(req, guid) {
   log('Downloading', req.book.title, '→', rel.title);
 }
 
+// ---------- Manual requests (books that are not, or no longer, in the Audible catalog) ----------
+// They get an id in the shape of an ASIN, starting with "M" – real ASINs start with a digit (ISBN) or
+// "B" – so book page, approval, release list and notifications work the same way.
+export const isManualId = (id) => /^M[A-Z0-9]{9}$/.test(String(id || ''));
+const LANGS = ['english', 'german', 'french', 'italian', 'spanish', 'japanese', 'dutch'];
+
+/** The book behind an id: from Audible, or the stored manual entry. */
+export async function bookFor(asin) {
+  if (!isManualId(asin)) return getBook(asin);
+  const r = state.requests.find((x) => x.asin === asin && x.book?.manual);
+  if (!r) throw new UserError('book_not_found', {}, 404);
+  return r.book;
+}
+
+function manualBook(input) {
+  const clean = (v, max) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const title = clean(input.title, 200);
+  const author = clean(input.author, 120);
+  const narrator = clean(input.narrator, 120);
+  if (!title) throw new UserError('manual_no_title');
+  if (!author) throw new UserError('manual_no_author');
+  const year = /^\d{4}$/.test(String(input.year || '').trim()) ? String(input.year).trim() : '';
+  return {
+    asin: 'M' + randomId(5).toUpperCase().slice(0, 9).padEnd(9, '0'), manual: true,
+    title, subtitle: '', authors: [author], narrators: narrator ? [narrator] : [],
+    requireNarrator: !!narrator && input.requireNarrator !== false,
+    minutes: 0, abridged: input.abridged === true, release: year ? `${year}-01-01` : '', series: [],
+    cover: '', coverSmall: '', language: LANGS.includes(input.language) ? input.language : contentLanguage(),
+    publisher: '', summary: clean(input.note, 500), genres: [], rating: null,
+  };
+}
+
+/** Request by title, author and narrator, without an Audible entry. */
+export async function createManualRequest(user, input = {}) {
+  if (!user.permissions.request && user.role !== 'admin') throw new UserError('forbidden', {}, 403);
+  const book = manualBook(input);
+  const key = (b) => [b.title, b.authors[0], b.narrators[0] || '', b.abridged].map((x) => norm(String(x))).join('|');
+  const same = state.requests.find((r) => r.book?.manual && key(r.book) === key(book));
+  if (same && !['declined', 'not_found', 'failed'].includes(same.status)) throw new UserError('already_requested', {}, 409);
+  if (same) Object.assign(book, { asin: same.asin });
+  return submitRequest(user, book.asin, book);
+}
+
 /** New request by a user. Users without auto-approve create a pending request. */
 export async function createRequest(user, asin) {
   if (!user.permissions.request && user.role !== 'admin') throw new UserError('forbidden', {}, 403);
-  const book = await getBook(asin);
+  return submitRequest(user, asin, await bookFor(asin));
+}
+
+async function submitRequest(user, asin, book) {
   let req = state.requests.find((r) => r.asin === asin);
   if (req && !['declined', 'not_found', 'failed'].includes(req.status)) throw new UserError('already_requested', {}, 409);
   const now = new Date().toISOString();
@@ -87,7 +133,7 @@ export async function createRequest(user, asin) {
     req = { id: randomId(5), asin, createdAt: now };
     state.requests.unshift(req);
   }
-  Object.assign(req, { book, requestedBy: user.id, decidedBy: null, updatedAt: now, message: null, release: null });
+  Object.assign(req, { book, manual: !!book.manual, requestedBy: user.id, decidedBy: null, updatedAt: now, message: null, release: null });
   const auto = user.role === 'admin' || user.permissions.autoApprove;
   if (auto) {
     req.decidedBy = user.id;
@@ -118,7 +164,7 @@ export async function approveRequest(admin, id, guid) {
 export async function requestWithRelease(user, asin, guid) {
   let req = state.requests.find((r) => r.asin === asin);
   if (!req) {
-    req = { id: randomId(5), asin, createdAt: new Date().toISOString(), book: await getBook(asin), requestedBy: user.id };
+    req = { id: randomId(5), asin, createdAt: new Date().toISOString(), book: await bookFor(asin), requestedBy: user.id };
     state.requests.unshift(req);
   }
   return approveRequest(user, req.id, guid);
@@ -193,7 +239,7 @@ async function importDownload(req, storage, keepSource) {
     title: cleanTitle(book.title), subtitle: book.subtitle || null, authors: book.authors, narrators: book.narrators,
     series: book.series.map((s) => (s.seq ? `${s.title} #${s.seq}` : s.title)), genres: book.genres,
     publishedYear: (book.release || '').slice(0, 4) || null, publisher: book.publisher || null,
-    description: book.summary || null, asin: book.asin, language: book.language || null,
+    description: book.summary || null, asin: book.manual ? null : book.asin, language: book.language || null,
     abridged: book.abridged, explicit: false, tags: [], chapters: [],
   };
   await fs.writeFile(path.join(dest, 'metadata.json'), JSON.stringify(meta, null, 2));
@@ -217,8 +263,10 @@ async function linkInAbs(req) {
     const item = (await absItems()).find((x) => x.path === absPath);
     if (item) {
       req.absId = item.id;
-      await absMatch(item.id, req.asin, region().abs).catch(() => false);
-      const chapters = await absImproveChapters(item.id, req.asin, state.settings.general.region).catch((e) => `error ${e.message}`);
+      // A manual book is exactly the edition that is no longer on Audible: matching it would overwrite
+      // narrator and runtime with the current edition, so its own metadata.json stays authoritative.
+      if (!req.book?.manual) await absMatch(item.id, req.asin, region().abs).catch(() => false);
+      const chapters = await absImproveChapters(item.id, req.book?.manual ? null : req.asin, state.settings.general.region).catch((e) => `error ${e.message}`);
       if (chapters !== 'kept') log('Chapters', req.book.title, '→', chapters);
       const u = state.users.find((x) => x.id === req.requestedBy);
       if (u && state.settings.general.tagRequester) {

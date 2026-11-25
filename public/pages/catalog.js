@@ -1,6 +1,8 @@
 // Discover and search
 import { t } from '../i18n.js';
 import { api, card, empty, errText, esc, icon, skeletonRow, view } from '../lib.js';
+import { manualHint, openManualRequest } from './manual.js';
+import { can } from '../session.js';
 
 const SORT_KEYS = ['popular', 'hot', 'new', 'rating', 'old', 'long'];
 
@@ -96,7 +98,9 @@ export async function pageSearch(q, genre = '', sort = '') {
   v.innerHTML = head.replace('</h1>', `</h1>`) +
     (items.length
       ? `<p class="muted">${items.length} ${esc(t('search.results'))}</p><div class="grid">${items.map(card).join('')}</div>`
-      : empty(icon.search, t('search.none')));
+      : empty(icon.search, t('search.none')))
+    + (q && can('request') ? manualHint() : '');
+  v.querySelector('[data-manual]')?.addEventListener('click', () => openManualRequest({ title: q }));
   const sel = v.querySelector('[data-search-sort]');
   if (sel) sel.addEventListener('change', (e) => {
     const p = new URLSearchParams({ genre, sort: e.target.value });

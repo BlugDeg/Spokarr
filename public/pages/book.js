@@ -1,7 +1,7 @@
 // Book detail page
 import { t } from '../i18n.js';
 import {
-  api, avatar, badge, busy, date, duration, errText, esc, icon, languageName, msgText, post, since, size, spinner, toast, view, year,
+  api, avatar, badge, busy, coverOf, date, duration, errText, esc, icon, languageName, msgText, post, since, size, spinner, toast, view, year,
 } from '../lib.js';
 import { can, session } from '../session.js';
 
@@ -71,11 +71,11 @@ function render(b) {
 
   view().innerHTML = `
   <div class="detail">
-    <div class="detail-bg" style="background-image:url('${esc(b.cover)}')"></div>
+    <div class="detail-bg" style="background-image:url('${esc(coverOf(b, false))}')"></div>
     <div class="detail-inner">
-      <img class="detail-cover" src="${esc(b.cover)}" alt="">
+      <img class="detail-cover" src="${esc(coverOf(b, false))}" alt="">
       <div class="detail-info">
-        <div class="badges">${badge(st)}<span class="badge b-type">${esc(edition)}</span>${b.language ? `<span class="badge b-type">${esc(languageName(b.language))}</span>` : ''}</div>
+        <div class="badges">${badge(st)}${b.manual ? `<span class="badge b-manual">${esc(t('manual.badge'))}</span>` : ''}<span class="badge b-type">${esc(edition)}</span>${b.language ? `<span class="badge b-type">${esc(languageName(b.language))}</span>` : ''}</div>
         <h1>${esc(b.title)}</h1>
         ${b.subtitle ? `<div class="sub">${esc(b.subtitle)}</div>` : ''}
         <div class="facts">
@@ -101,10 +101,10 @@ function render(b) {
         ${row(t('book.narrator'), esc(b.narrators.join(', ')))}
         ${row(t('book.length'), duration(b.minutes))}
         ${row(t('book.edition'), esc(edition))}
-        ${row(t('book.released'), date(b.release))}
+        ${row(t('book.released'), b.manual ? year(b.release) : date(b.release))}
         ${row(t('book.publisher'), esc(b.publisher))}
         ${b.rating ? row(t('book.rating'), '★ ' + b.rating.toFixed(1)) : ''}
-        ${row('ASIN', esc(b.asin))}
+        ${b.manual ? row(t('manual.source'), esc(t(b.requireNarrator ? 'manual.sourceNarrator' : 'manual.sourceText'))) : row('ASIN', esc(b.asin))}
       </div>
     </div>
   </div>`;

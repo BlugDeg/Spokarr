@@ -49,6 +49,9 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
   rating, release date or length. Every row opens as a page of its own.
 - ➕ **One-tap requests** and a clear status for every book: pending, downloading with progress,
   available.
+- ✍️ **Manual requests** for books Audible no longer sells or never had – older readings, other narrators,
+  radio plays, CD editions: enter title, author and narrator, and Spokarr searches your indexers directly
+  (optionally only releases that name that narrator).
 - 🎧 **Straight to listening**: “Listen in Audiobookshelf” opens the book in your library.
 - 🔐 **Sign in with Audiobookshelf** – same username and password, no extra accounts. Spokarr never
   stores passwords.

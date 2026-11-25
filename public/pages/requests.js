@@ -1,6 +1,7 @@
 // Requests list with filters, approval and retry
 import { t } from '../i18n.js';
-import { api, avatar, badge, busy, confirmDialog, del, empty, errText, esc, icon, msgText, post, since, size, toast, view } from '../lib.js';
+import { api, avatar, badge, busy, confirmDialog, coverOf, del, empty, errText, esc, icon, msgText, post, since, size, toast, view } from '../lib.js';
+import { openManualRequest } from './manual.js';
 import { can, session } from '../session.js';
 
 let timer = null;
@@ -27,11 +28,12 @@ export async function pageRequests(quiet = false) {
   const count = (k) => list.filter(FILTERS[k]).length;
   const shown = list.filter(FILTERS[filter]);
   v.innerHTML = `
-    <div class="page-head"><h1 class="page-title">${esc(t('req.title'))}</h1></div>
+    <div class="page-head"><h1 class="page-title">${esc(t('req.title'))}</h1>${can('request') ? `<button class="btn btn-ghost" id="manualBtn">${icon.plus}${esc(t('manual.open'))}</button>` : ''}</div>
     <div class="chips">${keys.map((k) => `<button class="chip ${k === filter ? 'on' : ''}" data-filter="${k}">${esc(t('req.filter.' + k))}<span>${count(k)}</span></button>`).join('')}</div>
     ${shown.length ? `<div class="req-list">${shown.map((r) => item(r, manager)).join('')}</div>` : empty(icon.book, t('req.empty'))}`;
 
   v.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.filter; pageRequests(true); }));
+  v.querySelector('#manualBtn')?.addEventListener('click', () => openManualRequest());
   v.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
     if (!(await confirmDialog(t('req.removeConfirm')))) return;
     try { await del('/api/requests/' + b.dataset.del); } catch (e) { toast(errText(e), 'err'); }
@@ -55,7 +57,7 @@ export async function pageRequests(quiet = false) {
 }
 
 function item(r, manager) {
-  const cover = esc(r.book.coverSmall || r.book.cover);
+  const cover = esc(coverOf(r.book));
   const actions = [];
   if (manager && r.status === 'pending') {
     actions.push(`<button class="btn btn-sm btn-green" data-approve="${r.id}">${icon.check}${esc(t('book.approve'))}</button>`);

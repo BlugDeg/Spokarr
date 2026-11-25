@@ -145,7 +145,11 @@ export function scoreRelease(book, rel) {
     else if (mbPerMin > 4) { s -= 10; minus.push('too_large'); }
   }
   if (rel.protocol === 'torrent' && rel.seeders === 0) { s -= 40; minus.push('no_seeders'); }
-  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language') && !minus.includes('no_seeders'), minus, plus };
+  // Manual requests for one particular reading ("Nigel Planer"): without the narrator in the release
+  // name it is most likely the current edition – shown, but never picked automatically
+  const narratorMissing = book.requireNarrator && !plus.includes('narrator');
+  if (narratorMissing) minus.push('narrator_missing');
+  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language') && !minus.includes('no_seeders') && !narratorMissing, minus, plus };
 }
 
 export async function findReleases(book) {
@@ -153,7 +157,9 @@ export async function findReleases(book) {
   const useProwlarr = prowlarrEnabled();
   if (!indexers.length && !useProwlarr) throw new UserError('indexer_not_configured');
   const base = cleanTitle(book.title);
-  const queries = [...new Set([base, GERMAN_TRANSLIT(base)])].filter(Boolean);
+  // A wanted narrator also goes into the search – indexers often name the reader of older editions
+  const withNarrator = book.requireNarrator && book.narrators[0] ? [`${base} ${book.narrators[0]}`] : [];
+  const queries = [...new Set([base, GERMAN_TRANSLIT(base), ...withNarrator])].filter(Boolean);
   const seen = new Map();
   const errors = [];
   const sources = [

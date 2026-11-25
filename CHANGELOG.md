@@ -3,6 +3,16 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] – unreleased
+
+### Added
+- **Manual requests** for books that are not, or no longer, in the Audible catalog (older readings such
+  as Nigel Planer's Discworld, radio plays, CD editions): title, author, narrator, language, year,
+  abridged. Spokarr searches the indexers with title (and title + narrator), scores the releases as usual
+  and – if wanted – only picks releases that name the narrator. The book is imported with its own
+  metadata and not matched against Audible, so the current edition does not overwrite the narrator.
+  "Request manually" on the search results and the requests page. Suggested on Reddit – thanks!
+
 ## [0.8.0] – 2026-11-25
 
 ### Added

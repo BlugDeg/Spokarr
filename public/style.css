@@ -431,3 +431,9 @@ details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
 .auth-card .auth-brand { margin-top: 26px; }
 .settings-section .indexer-head h2 { margin: 0; }
 .settings-section .indexer-head .toggle { padding: 0; margin: 0 0 0 auto; }
+
+/* Manual requests */
+.manual-hint { display: flex; align-items: center; gap: 16px; justify-content: space-between; flex-wrap: wrap; padding: 14px 18px; margin-top: 22px; }
+.manual-hint > div { display: flex; flex-direction: column; gap: 2px; }
+.manual-hint small { color: var(--dim); font-size: 13px; }
+.b-manual { background: rgba(245,158,11,.15); color: #fcd34d; }

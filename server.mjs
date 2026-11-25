@@ -5,11 +5,11 @@ import fss from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { absEnabled, absLibraries, absStatus, absUsers } from './src/abs.mjs';
-import { browseGenre, categoryIndex, contentLanguage, discoverRow, discoverRows, genreNames, getBook, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
+import { browseGenre, categoryIndex, contentLanguage, discoverRow, discoverRows, genreNames, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
 import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired } from './src/auth.mjs';
 import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
-  ACTIVE, approveRequest, createRequest, declineRequest, poll, publicRequest, requestWithRelease, statusResolver,
+  ACTIVE, approveRequest, bookFor, createManualRequest, createRequest, declineRequest, poll, publicRequest, requestWithRelease, statusResolver,
 } from './src/requests.mjs';
 import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
@@ -264,13 +264,13 @@ route('GET', '/api/search', USER, async ({ url }) => {
   return annotate(items);
 });
 route('GET', /^\/api\/book\/([A-Z0-9]{10})$/, USER, async ({ m, user }) => {
-  const [book] = await annotate([await getBook(m[1])]);
+  const [book] = await annotate([await bookFor(m[1])]);
   const r = state.requests.find((x) => x.asin === m[1]);
   const visible = r && (can(user, 'manageRequests') || r.requestedBy === user.id);
   return { ...book, request: visible ? publicRequest(r) : (r ? { status: r.status } : null) };
 });
 route('GET', /^\/api\/book\/([A-Z0-9]{10})\/releases$/, MANAGER, async ({ m }) => {
-  const rel = await findReleases(await getBook(m[1]));
+  const rel = await findReleases(await bookFor(m[1]));
   return rel.map(({ link, ...r }) => r);
 });
 route('POST', /^\/api\/book\/([A-Z0-9]{10})\/download$/, MANAGER, async ({ m, user, body }) => {
@@ -287,6 +287,7 @@ route('POST', '/api/requests', USER, async ({ user, body }) => {
   if (!/^[A-Z0-9]{10}$/.test(body.asin || '')) throw new UserError('invalid_asin');
   return publicRequest(await createRequest(user, body.asin));
 });
+route('POST', '/api/requests/manual', USER, async ({ user, body }) => publicRequest(await createManualRequest(user, body)));
 route('POST', /^\/api\/requests\/([a-z0-9]+)\/approve$/, MANAGER, async ({ m, user, body }) => publicRequest(await approveRequest(user, m[1], body.guid)));
 route('POST', /^\/api\/requests\/([a-z0-9]+)\/decline$/, MANAGER, async ({ m, user }) => publicRequest(await declineRequest(user, m[1])));
 route('DELETE', /^\/api\/requests\/([a-z0-9]+)$/, USER, async ({ m, user }) => {

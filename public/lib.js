@@ -97,10 +97,12 @@ export function avatar(name, cls = '') {
   return `<span class="avatar ${cls}" style="background:${AVATAR_COLORS[h % AVATAR_COLORS.length]}">${esc(n.slice(0, 1).toUpperCase())}</span>`;
 }
 
+export const PLACEHOLDER = '/cover-placeholder.svg';
+export const coverOf = (b, small = true) => (small ? b.coverSmall || b.cover : b.cover || b.coverSmall) || PLACEHOLDER;
 export function card(b) {
   const series = b.series?.[0];
   return `<a class="card" href="#/book/${b.asin}" title="${esc(b.title)}">
-    <img class="cover" src="${esc(b.coverSmall || b.cover)}" alt="" loading="lazy">
+    <img class="cover" src="${esc(coverOf(b))}" alt="" loading="lazy">
     ${badge(b.status)}
     <div class="overlay"><b>${esc(b.title)}</b><small>${esc(b.authors?.[0] || '')}${b.narrators?.length ? ' · ' + esc(b.narrators[0]) : ''}</small>${series ? `<small>${esc(series.title)}${series.seq ? ' #' + esc(series.seq) : ''}</small>` : ''}</div>
     <div class="card-meta"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.authors?.join(', ') || '')}</div></div>
