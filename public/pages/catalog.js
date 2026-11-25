@@ -1,6 +1,6 @@
 // Discover and search
 import { t } from '../i18n.js';
-import { api, card, empty, esc, icon, skeletonRow, view } from '../lib.js';
+import { api, card, empty, errText, esc, icon, skeletonRow, view } from '../lib.js';
 
 const SORT_KEYS = ['popular', 'hot', 'new', 'rating', 'old', 'long'];
 
@@ -31,7 +31,7 @@ export async function pageDiscover(sort = '') {
   const current = sort || cfg.genreSort || 'popular';
   const body = rows.filter((r) => r.items.length).map((r) => `
     <section class="row">
-      <div class="row-head"><h2>${esc(r.title || t('row.' + r.id))}<span class="row-count">${r.items.length}</span></h2></div>
+      <div class="row-head"><h2><a href="#/row/${encodeURIComponent(r.id)}">${esc(r.title || t('row.' + r.id))}<span class="row-count">${r.items.length}</span></a></h2></div>
       <div class="scroller">${r.items.map(card).join('')}</div>
     </section>`).join('');
   // The sort control only applies to the genre rows - "Popular" and "New releases" are fixed rows,
@@ -42,6 +42,34 @@ export async function pageDiscover(sort = '') {
     const s = e.target.value;
     location.hash = s === 'popular' ? '#/' : '#/?sort=' + encodeURIComponent(s);
   });
+}
+
+/**
+ * One Discover row as a page of its own – reached by clicking the row heading. Genre rows keep the
+ * sort picker, the other rows are fixed (best sellers / new releases / keyword).
+ */
+export async function pageRow(id, sort = '') {
+  const v = view();
+  const isGenre = /^genre/.test(id);
+  const cfg = await api('/api/config').catch(() => ({ genreSort: 'popular' }));
+  const current = sort || cfg.genreSort || 'popular';
+  const skeletons = `<div class="grid">${'<div class="skel skel-card"></div>'.repeat(12)}</div>`;
+  v.innerHTML = skeletons;
+  let row;
+  try {
+    row = await api(`/api/row/${encodeURIComponent(id)}` + (isGenre ? '?sort=' + encodeURIComponent(current) : ''));
+  } catch (e) {
+    v.innerHTML = empty(icon.warn, errText(e));
+    return;
+  }
+  const title = row.title || t('row.' + row.id);
+  v.innerHTML = `<h1 class="page-title">${esc(title)}</h1>`
+    + (isGenre ? `<div class="sortbar">${sortField(current, 'data-row-sort')}</div>` : '')
+    + (row.items.length
+      ? `<p class="muted">${row.items.length} ${esc(t('search.results'))}</p><div class="grid">${row.items.map(card).join('')}</div>`
+      : empty(icon.search, t('search.none')));
+  const sel = v.querySelector('[data-row-sort]');
+  if (sel) sel.addEventListener('change', (e) => { location.hash = `#/row/${encodeURIComponent(id)}?sort=${encodeURIComponent(e.target.value)}`; });
 }
 
 export async function pageSearch(q, genre = '', sort = '') {

@@ -266,26 +266,67 @@ export async function getBook(asin) {
   });
 }
 
+/** Several pages of a search, deduplicated by ASIN – the API returns at most 50 per page and the
+ *  language filter drops entries, so pages are pulled until the wanted number is reached. */
+async function searchPaged(params, limit, { languageOnly = false } = {}) {
+  const out = [];
+  const seen = new Set();
+  // Audible counts pages from zero: no `page` and `page=0` answer the same, `page=1` is already
+  // results 51-100. Counting from 1 here skipped that block (and the first request was sent with
+  // an explicit page, which returns a different ranking).
+  for (let page = 0; page < 4 && out.length < limit; page++) {
+    const got = await searchAudible({ ...params, num_results: 50, ...(page ? { page } : {}) }, { languageOnly });
+    if (!got.length) break;
+    for (const b of got) if (b.asin && !seen.has(b.asin)) { seen.add(b.asin); out.push(b); }
+  }
+  return out.slice(0, limit);
+}
+
+/**
+ * The rows of the Discover page, each with a fetcher that takes the wanted number of titles.
+ * Used both for the preview rows and for the page behind a row heading.
+ */
+function rowDefs(sortOverride = '') {
+  const g = state.settings.general;
+  const today = new Date().toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+  return [
+    ['popular', null, (limit) => searchPaged({ products_sort_by: 'BestSellers' }, limit, { languageOnly: true })],
+    ['new', null, async (limit) => (await searchPaged({ products_sort_by: 'BestSellers' }, Math.max(limit * 2, 50), { languageOnly: true }))
+      .filter((b) => b.release && b.release <= today && b.release >= cutoff)],
+    ...(g.discoverRows || []).filter((r) => r.title).map((row, i) => ['custom' + i, row.title, async (limit) => {
+      let items = await searchPaged({ products_sort_by: 'BestSellers', keywords: row.keywords || row.title }, limit * 2, { languageOnly: true });
+      const narr = norm(row.narrator);
+      if (narr) items = items.filter((b) => b.narrators.some((n) => norm(n) === narr));
+      return items;
+    }]),
+    // Custom genre rows: resolve the Audible category node and show its bestsellers
+    ...(g.discoverGenres || []).filter(Boolean).map((genre, i) => ['genre' + i, genre,
+      (limit) => browseGenre(genre, { sort: sortOverride || g.genreSort || 'popular', limit })]),
+  ];
+}
+
 export async function discoverRows(sortOverride = '') {
   const g = state.settings.general;
-  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.discoverRows)}:${JSON.stringify(g.discoverGenres || [])}:${sortOverride}:${g.genreSort || ''}:${g.rowItems || 20}`, 30 * 60e3, async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const cutoff = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
-    const jobs = [
-      ['popular', null, () => searchAudible({ products_sort_by: 'BestSellers' }, { languageOnly: true })],
-      ['new', null, async () => (await searchAudible({ products_sort_by: 'BestSellers', num_results: 50 }, { languageOnly: true }))
-        .filter((b) => b.release && b.release <= today && b.release >= cutoff)],
-      ...(g.discoverRows || []).filter((r) => r.title).map((row, i) => ['custom' + i, row.title, async () => {
-        let items = await searchAudible({ products_sort_by: 'BestSellers', keywords: row.keywords || row.title }, { languageOnly: true });
-        const narr = norm(row.narrator);
-        if (narr) items = items.filter((b) => b.narrators.some((n) => norm(n) === narr));
-        return items;
-      }]),
-      // Custom genre rows: resolve the Audible category node and show its bestsellers
-      ...(g.discoverGenres || []).filter(Boolean).map((genre, i) => ['genre' + i, genre, async () => browseGenre(genre, { sort: sortOverride || g.genreSort || 'popular', limit: 50 })]),
-    ];
+  const limit = g.rowItems || 20;
+  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.discoverRows)}:${JSON.stringify(g.discoverGenres || [])}:${sortOverride}:${g.genreSort || ''}:${limit}`, 30 * 60e3, async () => {
+    const jobs = rowDefs(sortOverride);
     return Promise.all(jobs.map(async ([id, title, fn]) => {
-      try { return { id, title, items: (await fn()).slice(0, g.rowItems || 20) }; } catch (e) { return { id, title, items: [], error: e.message }; }
+      try { return { id, title, items: (await fn(limit)).slice(0, limit) }; } catch (e) { return { id, title, items: [], error: e.message }; }
     }));
   });
+}
+
+/** One row on its own page: the same row as on Discover, only with more titles. */
+export async function discoverRow(id, { sort = '', limit = 100 } = {}) {
+  const def = rowDefs(sort).find(([rid]) => rid === id);
+  if (!def) throw new UserError('row_unknown', {}, 404);
+  const [rid, title, fn] = def;
+  const g = state.settings.general;
+  const items = await cached(`row:${g.region}:${contentLanguage()}:${rid}:${sort}:${limit}`, 10 * 60e3,
+    () => fn(limit).catch((e) => {
+      log(`Row ${rid} could not be loaded:`, e.message);
+      throw new UserError('discover_unavailable', {}, 502);
+    }));
+  return { id: rid, title, items: items.slice(0, limit) };
 }
