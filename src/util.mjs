@@ -18,6 +18,9 @@ export const norm = (s) => GERMAN_TRANSLIT(String(s || '')).normalize('NFKD').re
 // Edition notes that never appear in release names ("Narrated by …", "Gesprochen von …", "(Unabridged)")
 const EDITION_SUFFIX = /\s*[-–:|]\s*(narrated|read by|unabridged|abridged|dramati[sz]ed|gesprochen|gelesen|ungekürzt|gekürzt|die ungekürzte|das hörspiel|hörspiel|hörbuch|lu par|letto da|narrado).*$/i;
 export const cleanTitle = (t) => String(t || '').replace(EDITION_SUFFIX, '').replace(/\s*[([][^)\]]*[)\]]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+// ABS stores several authors as one string ("A, B"), Audible returns one entry per author – so only
+// the first name is compared, otherwise a book written by two people never matches.
+export const firstAuthor = (s) => String(s || '').split(/\s*(?:,|&|\bund\b)\s*/i).map((x) => x.trim()).filter(Boolean)[0] || '';
 export const safeName = (s) => String(s || 'Unknown').replace(/[\/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Unknown';
 export const stripHtml = (s) => String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]+>/g, '')
   .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
