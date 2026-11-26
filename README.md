@@ -64,9 +64,10 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 - ✉️ **Invite links**: send a link, the person picks a username and password, and Spokarr creates the
   account in Audiobookshelf and in Spokarr. Valid for 1, 7 or 30 days, once or several times.
 - 🔄 **Update notice**: admins see at the bottom left when a new release is out (can be switched off).
-- 🧠 **Smart release matching**: every result is scored on title, narrator, language, abridged vs.
-  unabridged, dramatizations and size per minute. “View releases” shows the score and the reasons, and
-  lets you pick a release by hand.
+- 🧠 **Smart release matching**: every result is scored on title, author, narrator, language, abridged vs.
+  unabridged, dramatizations and size per minute. Short titles (“The Knot”) are only picked when the
+  release also names the author – optionally for every title. “View releases” shows the score and the
+  reasons, and lets you pick a release by hand.
 - 🗂️ **Clean import**: downloads are moved to `Author/Title`, get a `metadata.json` and a cover,
   Audiobookshelf scans and matches the book, and it is tagged “Requested by &lt;name&gt;”.
 - 📑 **Real chapters**: releases with one file per CD track get proper chapters from the files' title

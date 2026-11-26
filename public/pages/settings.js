@@ -95,6 +95,7 @@ function general() {
       ${toggle('request', g.defaultPermissions.request, t('perm.request'), t('perm.requestHint'))}
       ${toggle('autoApprove', g.defaultPermissions.autoApprove, t('perm.autoApprove'), t('perm.autoApproveHint'))}
       ${toggle('manageRequests', g.defaultPermissions.manageRequests, t('perm.manageRequests'), t('perm.manageRequestsHint'))}`, t('settings.defaultsHint'))}
+    ${section(t('settings.matching'), toggle('requireAuthor', g.requireAuthor === true, t('settings.requireAuthor'), t('settings.requireAuthorHint')))}
     ${section(t('settings.abs'), toggle('tagRequester', g.tagRequester, t('settings.tagRequester'), t('settings.tagRequesterHint')))}
     ${section(t('settings.app'), `
       <div class="grid-2">${field(t('settings.appUrl'), text('appUrl', g.appUrl, 'type="url" placeholder="https://spokarr.example.com"'), t('settings.appUrlHint'))}
@@ -119,7 +120,7 @@ function bindGeneral() {
       try {
         await save({ general: {
           region: f.region.value, contentLanguage: f.contentLanguage.value, tagRequester: f.tagRequester.checked,
-          appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value), updateCheck: f.updateCheck.checked,
+          appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value), updateCheck: f.updateCheck.checked, requireAuthor: f.requireAuthor.checked,
           discoverRows: [...rows.querySelectorAll('.row-edit')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value]))),
           discoverGenres: String(f.discoverGenres.value || '').split(',').map((x) => x.trim()).filter(Boolean),
           genreSort: f.genreSort.value, rowItems: Math.min(50, Math.max(10, Number(f.rowItems.value) || 20)),

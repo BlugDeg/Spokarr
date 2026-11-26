@@ -47,6 +47,7 @@ function settingsFromEnv() {
       notifyLanguage: (env.AUDIBLE_REGION || '').toLowerCase() === 'de' ? 'de' : 'en',
       stallHours: 6,
       updateCheck: env.UPDATE_CHECK !== 'false',
+      requireAuthor: false,
     },
     notifications: {
       discord: { enabled: false, webhook: '', events: ['pending', 'available', 'failed', 'stalled'] },

@@ -109,6 +109,8 @@ const LANG_TOKENS = {
   japanese: ['japanese', 'jap', 'jpn'],
 };
 const ENGLISH_STOPWORDS = /\b(the|and|of)\b/;
+// Words that do not make a title distinctive (articles, "and", "of" …)
+const STOPWORDS = new Set(['the', 'a', 'an', 'and', 'of', 'to', 'in', 'on', 'der', 'die', 'das', 'und', 'ein', 'eine', 'von', 'im', 'le', 'la', 'les', 'el', 'il']);
 
 export function scoreRelease(book, rel) {
   const n = norm(rel.title);
@@ -129,7 +131,13 @@ export function scoreRelease(book, rel) {
   const readMarker = /\b(read by|narrated by|gelesen von|gesprochen von|autorenlesung|liest)\b/.test(n);
   const narratorHit = ownNarr.length ? ownNarr.some((w) => words.has(w)) : narrWords.length > 0 && readMarker && narrWords.some((w) => words.has(w));
   if (narratorHit) { s += 25; plus.push('narrator'); }
-  if (authWords.some((w) => words.has(w))) s += 5;
+  const authorHit = authWords.some((w) => words.has(w));
+  if (authorHit) { s += 5; plus.push('author'); }
+  // A short title ("The Knot", "Momo") is contained in many other names ("Untying the Knot"), so the
+  // title alone proves nothing there: the author has to be named too. Optional for every title.
+  const shortTitle = titleWords.filter((w) => !STOPWORDS.has(w)).length <= 2;
+  const authorMissing = authWords.length > 0 && !authorHit && (shortTitle || state.settings.general.requireAuthor === true);
+  if (authorMissing) { s -= 20; minus.push('author_missing'); }
 
   // Language: bonus when the release names the book's language, penalty when it names another one
   const bookLang = book.language || contentLanguage();
@@ -158,7 +166,7 @@ export function scoreRelease(book, rel) {
   // name it is most likely the current edition – shown, but never picked automatically
   const narratorMissing = book.requireNarrator && !plus.includes('narrator');
   if (narratorMissing) minus.push('narrator_missing');
-  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language') && !minus.includes('no_seeders') && !narratorMissing, minus, plus };
+  return { score: s, ok: hit >= 0.75 && s >= 50 && !minus.includes('wrong_language') && !minus.includes('no_seeders') && !narratorMissing && !authorMissing, minus, plus };
 }
 
 export async function findReleases(book) {

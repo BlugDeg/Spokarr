@@ -90,6 +90,7 @@ function applySettings(body) {
     if (g.appUrl !== undefined) s.general.appUrl = trimUrl(g.appUrl);
     if (g.notifyLanguage !== undefined) s.general.notifyLanguage = g.notifyLanguage === 'de' ? 'de' : 'en';
     if (g.updateCheck !== undefined) s.general.updateCheck = bool(g.updateCheck);
+    if (g.requireAuthor !== undefined) s.general.requireAuthor = bool(g.requireAuthor);
     if (g.stallHours !== undefined) s.general.stallHours = Math.min(168, Math.max(1, Number(g.stallHours) || 6));
   }
   if (body.abs) {

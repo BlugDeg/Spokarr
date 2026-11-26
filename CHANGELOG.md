@@ -3,6 +3,21 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] – 2026-11-26
+
+### Fixed
+- **Wrong book for short titles:** a request for "The Knot" downloaded "Untying the Knot" by another
+  author, because every word of a short title was in the release name. Titles of one or two words
+  (articles not counted) now need the author in the release name as well; otherwise the release is
+  still listed, but not picked automatically. Reported by hymner (#11) – thanks!
+- Author and narrator lists only show books the person is really credited on (Audible's filter also
+  returned "Dale Carnegie" for "Jim Dale"). By TheLord83 (#12).
+
+### Added
+- Setting *Release selection → Author must be in the release name* to apply the author check to every
+  title. Off by default, because many releases (especially German usenet ones) leave the author out.
+- Releases show "Author in name" / "Author not named" among the reasons.
+
 ## [0.10.0] – 2026-11-25
 
 ### Added
