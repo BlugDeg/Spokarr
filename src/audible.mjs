@@ -139,6 +139,18 @@ const LOCAL_SORT = {
   title: (a, b) => locale(a.title, b.title),
 };
 
+// Audible's author/narrator filter matches single words, so `narrator=Jim Dale` also answers with books
+// read by "Dale Carnegie". Every word of the requested name has to be in the credited name, which keeps
+// "Stephen King, 1947-" and drops the other Jim.
+const carriesName = (book, kind, value) => {
+  const want = norm(value).split(' ').filter(Boolean);
+  const credited = kind === 'author' ? book.authors : book.narrators;
+  return (credited || []).some((n) => {
+    const have = new Set(norm(n).split(' '));
+    return want.every((w) => have.has(w));
+  });
+};
+
 // A series is sorted after it has been narrowed down to its own parts - sorting it at the API would
 // drop parts, because the API sorts before we filter. Part number is the natural default.
 const partSeq = (book, key) => Number(String(((book.series || []).find((s) => norm(s.title) === key) || {}).seq || '').replace(',', '.')) || 0;
@@ -394,9 +406,14 @@ export async function listBy(kind, name, { limit = 100, sort = 'popular' } = {})
     if (!param) throw new UserError('list_bad_kind');
     // No paging here: the author/narrator filter shows the whole list on one page, and the API
     // returns something else entirely once `page` is sent along with it.
-    const items = await searchAudible({
+    const raw = await searchAudible({
       products_sort_by: API_SORT_FOR_LIST[sort] || API_SORT_FOR_LIST.popular, [param]: value, num_results: 50,
     }, { languageOnly: true });
+    let items = raw.filter((b) => carriesName(b, kind, value));
+    // The filter matches single words, so "Jim Dale" also brings books by "Dale Carnegie" - the local
+    // check above drops those. If it drops everything, Audible spells the name differently from the
+    // request and the filter's own answer is the better one.
+    if (!items.length) items = raw;
     if (LOCAL_SORT[sort]) items.sort(LOCAL_SORT[sort]);
     return items.slice(0, Math.min(limit, 50));
   });
