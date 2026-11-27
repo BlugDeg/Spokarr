@@ -63,7 +63,7 @@ export async function absLibraries(url = cfg().url, key = cfg().apiKey) {
 }
 export async function absUsers() {
   const d = await fetchJson(`${cfg().url}/api/users`, { headers: headers() }, 10000);
-  return (d.users || []).map((u) => ({ id: u.id, username: u.username, type: u.type, isActive: u.isActive !== false }));
+  return (d.users || []).map((u) => ({ id: u.id, username: u.username, email: u.email || '', type: u.type, isActive: u.isActive !== false }));
 }
 
 /**

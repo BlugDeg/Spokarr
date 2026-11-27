@@ -1,6 +1,6 @@
 // Settings (admins): general, Audiobookshelf, download client, indexers, about
 import { t } from '../i18n.js';
-import { api, busy, errText, esc, icon, languageName, post, put, toast, view } from '../lib.js';
+import { api, busy, copyText, errText, esc, icon, languageName, post, put, toast, view } from '../lib.js';
 import { session } from '../session.js';
 
 const TABS = ['general', 'abs', 'downloads', 'indexers', 'notifications', 'about'];
@@ -146,9 +146,57 @@ function abs() {
       ${field(t('settings.library'), `<select name="libraryId"><option value="">–</option>${libs.filter((l) => l.mediaType === 'book').map((l) => `<option value="${esc(l.id)}" ${l.id === a.libraryId ? 'selected' : ''}>${esc(l.name)}${l.folders?.length ? ' – ' + esc(l.folders.join(', ')) : ''}</option>`).join('')}</select>`, t('settings.libraryHint'))}
       ${field(t('settings.libraryMount'), text('libraryMount', a.libraryMount, 'placeholder="/audiobooks"'), t('settings.libraryMountHint', { dir: data.libraryDir }))}`, '', 'audiobookshelf')}
     ${saveBar(`<button type="button" class="btn btn-ghost" id="test">${icon.plug}${esc(t('settings.test'))}</button>`)}
+  </form>
+  ${sso()}`;
+}
+
+// Single sign-on: a card of its own below, with its own save button
+const ssoRedirect = () => `${(data.general.appUrl || location.origin).replace(/\/+$/, '')}/api/auth/oidc/callback`;
+function sso() {
+  const o = data.oidc || {};
+  return `<form id="fsso">${svcCard('data-sso', 'openid', t('sso.title'), '', !!o.enabled, `
+      <p class="muted">${esc(t('sso.hint'))}</p>
+      ${field(t('sso.issuer'), text('issuer', o.issuer, 'type="url" placeholder="https://auth.example.com/application/o/spokarr/"'), t('sso.issuerHint'))}
+      <div class="grid-2">
+        ${field(t('sso.clientId'), text('clientId', o.clientId, 'autocomplete="off"'))}
+        ${field(t('sso.clientSecret'), keyInput('clientSecret', o.hasClientSecret))}
+      </div>
+      <div class="grid-2">
+        ${field(t('sso.label'), text('label', o.label || 'SSO', 'maxlength="40"'), t('sso.labelHint'))}
+        ${field(t('sso.claim'), text('usernameClaim', o.usernameClaim || 'preferred_username'), t('sso.claimHint'))}
+      </div>
+      <label class="field"><span>${esc(t('sso.redirect'))}</span><div class="copy-row"><input readonly value="${esc(ssoRedirect())}" data-redirect><button type="button" class="icon-btn" data-copy title="${esc(t('sso.copy'))}" aria-label="${esc(t('sso.copy'))}">${icon.copy}</button></div><small>${esc(t('sso.redirectHint'))}</small></label>
+      ${toggle('hidePassword', !!o.hidePassword, t('sso.hidePassword'), t('sso.hidePasswordHint'))}
+      ${testFoot()}`)}
+    <div class="save-bar"><button class="btn btn-primary" type="submit">${esc(t('settings.save'))}</button></div>
   </form>`;
 }
+function bindSso() {
+  const f = document.getElementById('fsso');
+  if (!f) return;
+  bindCollapse(f);
+  const values = () => ({
+    enabled: f.enabled.checked, issuer: f.issuer.value, clientId: f.clientId.value, clientSecret: f.clientSecret.value,
+    label: f.label.value, usernameClaim: f.usernameClaim.value, hidePassword: f.hidePassword.checked,
+  });
+  f.querySelector('[data-copy]').addEventListener('click', () => copyText(f.querySelector('[data-redirect]').value));
+  f.querySelector('[data-test]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    const out = f.querySelector('[data-result]');
+    try {
+      const r = await post('/api/settings/test/oidc', { issuer: f.issuer.value });
+      out.className = 'test-result ok';
+      out.innerHTML = icon.check + esc(`${t('settings.testOk')} · ${r.issuer}`);
+    } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
+  }));
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy(f.querySelector('[type=submit]'), async () => {
+      try { await save({ oidc: values() }); pageSettings('abs'); } catch (err) { toast(errText(err), 'err'); }
+    });
+  });
+}
 function bindAbs() {
+  bindSso();
   const f = document.getElementById('f');
   const values = () => ({ url: f.url.value, publicUrl: f.publicUrl.value, apiKey: f.apiKey.value, libraryId: f.libraryId.value, libraryMount: f.libraryMount.value });
   f.querySelector('#test').addEventListener('click', (e) => busy(e.currentTarget, async () => {

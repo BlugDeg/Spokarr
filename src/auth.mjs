@@ -75,7 +75,18 @@ export async function login(req, res, { username, password }) {
     if (e.code === 'login_failed') noteFailure(ip);
     throw e;
   }
-  const absUser = result.user;
+  return startSession(req, res, result.user, result.token);
+}
+
+/** Signed in at the identity provider (OIDC) and matched to an Audiobookshelf account. */
+export async function ssoLogin(req, res, absUser) {
+  // The first sign-in sets Spokarr up (owner, API key) and needs the password login for that
+  if (setupRequired()) throw new UserError('oidc_setup_first', {}, 403);
+  return startSession(req, res, absUser, null);
+}
+
+async function startSession(req, res, absUser, absToken) {
+  const ip = clientIp(req);
   const isAbsAdmin = absUser.type === 'root' || absUser.type === 'admin';
   const firstUser = setupRequired();
   if (firstUser && !isAbsAdmin) throw new UserError('setup_needs_admin', {}, 403);
@@ -97,8 +108,8 @@ export async function login(req, res, { username, password }) {
 
   // First setup: let Spokarr create its own API key with the owner's session
   if (firstUser) {
-    if (!state.settings.abs.apiKey && result.token) {
-      const key = await absCreateApiKey(result.token, absUser.id);
+    if (!state.settings.abs.apiKey && absToken) {
+      const key = await absCreateApiKey(absToken, absUser.id);
       if (key) { state.settings.abs.apiKey = key; log('Created Audiobookshelf API key "Spokarr"'); }
     }
     for (const r of state.requests) if (!r.requestedBy) r.requestedBy = user.id;

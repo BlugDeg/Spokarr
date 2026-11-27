@@ -46,7 +46,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 - 🔎 **Discover and search** the Audible catalog of any store (US, UK, DE, FR, …) – covers, narrators,
   length, series, abridged or unabridged.
 - 🏷️ **Genres**: browse any Audible category, add genre rows to Discover and sort by popularity,
-  rating, release date or length. Every row opens as a page of its own.
+  rating, release date or length. Every row opens as a page of its own. The book page shows the
+  genre, and genres you never want to see (say, Romance) can be hidden from Discover.
 - ➕ **One-tap requests** and a clear status for every book: pending, downloading with progress,
   available.
 - ✍️ **Manual requests** for books Audible no longer sells or never had – older readings, other narrators,
@@ -63,6 +64,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
   Audiobookshelf users.
 - ✉️ **Invite links**: send a link, the person picks a username and password, and Spokarr creates the
   account in Audiobookshelf and in Spokarr. Valid for 1, 7 or 30 days, once or several times.
+- 🔐 **Single sign-on (OIDC)**: sign in through Authentik, Authelia, Keycloak, Pocket ID & co. – matched
+  to the Audiobookshelf account by username or email. Password sign-in stays available.
 - 🔄 **Update notice**: admins see at the bottom left when a new release is out (can be switched off).
 - 🧠 **Smart release matching**: every result is scored on title, author, narrator, language, abridged vs.
   unabridged, dramatizations and size per minute. Short titles (“The Knot”) are only picked when the
@@ -239,6 +242,24 @@ spokarr.example.com {
 Nginx Proxy Manager: *Add Proxy Host* → domain `spokarr.example.com`, scheme `http`, forward host and
 port `5057`; on the *SSL* tab request a Let's Encrypt certificate and enable *Force SSL*.
 
+### Single sign-on (OIDC)
+
+If your Audiobookshelf users sign in through an identity provider, Spokarr can do the same – the
+Audiobookshelf accounts stay the source of truth.
+
+1. At the provider, create an OIDC client (confidential, authorization code). Redirect URI:
+   `https://spokarr.example.com/api/auth/oidc/callback` – Spokarr shows the exact address under
+   **Settings → Audiobookshelf → Single sign-on**.
+2. In that card enter the issuer URL (the address that serves `/.well-known/openid-configuration`, e.g.
+   `https://auth.example.com/application/o/spokarr/` for Authentik), client ID and secret, then *Test* and
+   save. The login page now shows *Sign in with …*.
+3. Spokarr matches the person to the Audiobookshelf user with the same username (`preferred_username`,
+   configurable), otherwise with the same verified email. People without an Audiobookshelf account are
+   turned away – create the account first or send an invite link.
+
+The first setup still needs the password sign-in of an Audiobookshelf admin (Spokarr creates its API key
+with it). After that the password form can be hidden behind a link on the login page.
+
 ## Configuration
 
 Everything is configured in the web interface and stored in `data/settings.json`.
@@ -287,6 +308,9 @@ A release is picked automatically at 50 points or more. Everything else can be c
 - Passwords are checked by Audiobookshelf and never stored. Sessions are random tokens in an
   `HttpOnly`, `SameSite=Lax` cookie; only their hashes are saved.
 - Failed sign-ins are rate-limited (8 attempts per 15 minutes and IP).
+- Single sign-on uses the authorization code flow with PKCE, state and nonce. ID tokens are checked
+  against the provider's published keys (RSA, ECDSA, EdDSA; `none` and HMAC are refused), issuer,
+  audience and expiry. The client secret is never sent to the browser.
 - API keys are stored in `data/settings.json` with file mode `600` and never sent to the browser.
 - Put Spokarr behind HTTPS (see [Reverse proxy and HTTPS](#reverse-proxy-and-https)) if you expose it to
   the internet.

@@ -6,7 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { absEnabled, absLibraries, absStatus, absUsers } from './src/abs.mjs';
 import { browseGenre, categoryIndex, contentLanguage, discoverRow, discoverRows, genreNames, LIST_SORTS, listBy, REGIONS, searchAudible, SORTS } from './src/audible.mjs';
-import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired } from './src/auth.mjs';
+import { can, endSessionsOf, login, logout, publicUser, sessionUser, setupRequired, ssoLogin } from './src/auth.mjs';
+import { oidcEnabled, oidcFinish, oidcStart, testOidc } from './src/oidc.mjs';
 import { findReleases, testIndexer, testProwlarr } from './src/indexers.mjs';
 import {
   ACTIVE, approveRequest, bookFor, createManualRequest, createRequest, searchManual, declineRequest, poll, publicRequest, requestWithRelease, statusResolver,
@@ -19,7 +20,7 @@ import { availableUpdate, checkUpdateNow, latestRelease, startUpdateCheck } from
 import { testNzbget } from './src/nzbget.mjs';
 import { testSab } from './src/sab.mjs';
 import { DEFAULT_PERMISSIONS, LIBRARY_DIR, loadState, save, state } from './src/store.mjs';
-import { cached, log, randomId, trimUrl, uncache, UserError } from './src/util.mjs';
+import { cached, isHttps, log, randomId, trimUrl, trustedProxy, uncache, UserError } from './src/util.mjs';
 
 const VERSION = JSON.parse(fss.readFileSync(new URL('./package.json', import.meta.url))).version;
 const PORT = Number(process.env.PORT || 5057);
@@ -49,6 +50,7 @@ const mask = (s) => {
   const out = structuredClone(s);
   for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
   for (const sec of [out.qbit, out.nzbget, out.transmission]) { sec.hasPassword = !!sec.password; sec.password = ''; }
+  out.oidc.hasClientSecret = !!out.oidc.clientSecret; out.oidc.clientSecret = '';
   const n = out.notifications;
   n.discord.hasWebhook = !!n.discord.webhook; n.discord.webhook = '';
   n.ntfy.hasToken = !!n.ntfy.token; n.ntfy.token = '';
@@ -96,6 +98,21 @@ function applySettings(body) {
     if (g.updateCheck !== undefined) s.general.updateCheck = bool(g.updateCheck);
     if (g.requireAuthor !== undefined) s.general.requireAuthor = bool(g.requireAuthor);
     if (g.stallHours !== undefined) s.general.stallHours = Math.min(168, Math.max(1, Number(g.stallHours) || 6));
+  }
+  if (body.oidc) {
+    const o = body.oidc;
+    const next = {
+      ...s.oidc,
+      enabled: o.enabled !== undefined ? bool(o.enabled) : s.oidc.enabled,
+      issuer: o.issuer !== undefined ? trimUrl(o.issuer) : s.oidc.issuer,
+      clientId: o.clientId !== undefined ? String(o.clientId).trim() : s.oidc.clientId,
+      clientSecret: keepKey(o.clientSecret, s.oidc.clientSecret),
+      label: o.label !== undefined ? String(o.label).trim().slice(0, 40) || 'SSO' : s.oidc.label,
+      usernameClaim: o.usernameClaim !== undefined ? String(o.usernameClaim).trim() || 'preferred_username' : s.oidc.usernameClaim,
+      hidePassword: o.hidePassword !== undefined ? bool(o.hidePassword) : s.oidc.hidePassword,
+    };
+    if (next.enabled && (!next.issuer || !next.clientId)) throw new UserError('oidc_incomplete');
+    s.oidc = next;
   }
   if (body.abs) {
     const a = body.abs;
@@ -228,6 +245,8 @@ route('GET', '/api/status', PUBLIC_ROUTE, ({ user }) => ({
   user: publicUser(user),
   // Only admins can update the container, so only they see the hint
   update: user?.role === 'admin' ? availableUpdate() : null,
+  // Single sign-on button on the login page – only once Spokarr is set up
+  sso: oidcEnabled() && !setupRequired() ? { label: state.settings.oidc.label || 'SSO', hidePassword: !!state.settings.oidc.hidePassword } : null,
 }));
 route('POST', '/api/setup/abs', PUBLIC_ROUTE, async ({ body }) => {
   if (!setupRequired()) throw new UserError('forbidden', {}, 403);
@@ -239,6 +258,32 @@ route('POST', '/api/setup/abs', PUBLIC_ROUTE, async ({ body }) => {
   return { ok: true, version: info.version };
 });
 route('POST', '/api/auth/login', PUBLIC_ROUTE, async ({ req, res, body }) => ({ user: publicUser(await login(req, res, body)) }));
+// Where the provider sends the browser back to. Fixed by the Spokarr address when it is set, so it
+// matches what was registered at the provider; otherwise taken from the request.
+function ssoCallbackUrl(req) {
+  const app = state.settings.general.appUrl;
+  if (app) return `${trimUrl(app)}/api/auth/oidc/callback`;
+  const fwdHost = trustedProxy(req) ? String(req.headers['x-forwarded-host'] || '').split(',')[0].trim() : '';
+  return `${isHttps(req) ? 'https' : 'http'}://${fwdHost || req.headers.host}/api/auth/oidc/callback`;
+}
+const redirect = (res, to) => { res.writeHead(302, { Location: to, 'Cache-Control': 'no-store' }); res.end(); };
+const ssoError = (res, e) => {
+  if (!(e instanceof UserError)) log('SSO sign-in failed:', e.message);
+  else if (e.params?.message) log('SSO sign-in failed:', e.code, e.params.message);
+  redirect(res, `/?sso_error=${encodeURIComponent(e instanceof UserError ? e.code : 'oidc_error')}#/`);
+};
+route('GET', '/api/auth/oidc/start', PUBLIC_ROUTE, async ({ req, res }) => {
+  try {
+    if (setupRequired()) throw new UserError('oidc_setup_first');
+    redirect(res, await oidcStart(ssoCallbackUrl(req)));
+  } catch (e) { ssoError(res, e); }
+});
+route('GET', '/api/auth/oidc/callback', PUBLIC_ROUTE, async ({ req, res, url }) => {
+  try {
+    await ssoLogin(req, res, await oidcFinish(url.searchParams));
+    redirect(res, '/#/');
+  } catch (e) { ssoError(res, e); }
+});
 route('POST', '/api/auth/logout', PUBLIC_ROUTE, async ({ req, res }) => { await logout(req, res); return { ok: true }; });
 
 // ---------- Catalog ----------
@@ -400,6 +445,10 @@ route('POST', '/api/settings/test/transmission', ADMIN, async ({ body }) => test
   username: body.username ?? state.settings.transmission.username,
   password: keepKey(body.password, state.settings.transmission.password),
 }));
+route('POST', '/api/settings/test/oidc', ADMIN, async ({ req, body }) => ({
+  ...(await testOidc({ issuer: trimUrl(body.issuer ?? state.settings.oidc.issuer) })),
+  redirectUri: ssoCallbackUrl(req),
+}));
 route('POST', '/api/settings/test/prowlarr', ADMIN, async ({ body }) => testProwlarr({
   url: trimUrl(body.url ?? state.settings.prowlarr.url),
   apiKey: keepKey(body.apiKey, state.settings.prowlarr.apiKey),
@@ -434,6 +483,7 @@ const server = http.createServer(async (req, res) => {
         if (r.opts.perm && !can(user, r.opts.perm)) throw new UserError('forbidden', {}, 403);
         const body = mutating ? await readBody(req) : {};
         const out = await r.handler({ req, res, url, m, user, body });
+        if (res.headersSent) return; // the handler answered itself (redirect)
         return send(res, 200, out);
       }
       throw new UserError('not_found', {}, 404);

@@ -3,6 +3,19 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] – 2026-11-27
+
+### Added
+- **Single sign-on (OIDC)** with Authentik, Authelia, Keycloak, Pocket ID and other OpenID Connect
+  providers (Settings → Audiobookshelf → Single sign-on). The person is matched to their Audiobookshelf
+  account by username (`preferred_username`, configurable), otherwise by verified email. Authorization
+  code flow with PKCE, ID tokens checked against the provider's keys. The password form can be hidden
+  behind a link. Requested by heschdy and peanutbother (#10) – thanks!
+- **Hide genres on Discover** (Settings → General → Hide genres): books of these genres no longer show
+  up in Popular, New releases and your own rows; search and genre rows are not affected. Suggested by
+  hymner (#13) – thanks!
+- The **book page shows the genre** (Audible's category path); every step opens the genre search.
+
 ## [0.10.1] – 2026-11-26
 
 ### Fixed

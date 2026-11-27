@@ -93,6 +93,16 @@ function settingsFromEnv() {
       downloadDir: env.TRANSMISSION_DOWNLOAD_DIR || '',
       pathFrom: '', pathTo: '',
     },
+    // Single sign-on (OpenID Connect), matched to the Audiobookshelf accounts
+    oidc: {
+      enabled: !!(env.OIDC_ISSUER && env.OIDC_CLIENT_ID),
+      issuer: trimUrl(env.OIDC_ISSUER),
+      clientId: env.OIDC_CLIENT_ID || '',
+      clientSecret: env.OIDC_CLIENT_SECRET || '',
+      label: env.OIDC_BUTTON_LABEL || 'SSO',
+      usernameClaim: env.OIDC_USERNAME_CLAIM || 'preferred_username',
+      hidePassword: false,
+    },
     prowlarr: {
       enabled: !!env.PROWLARR_URL,
       url: trimUrl(env.PROWLARR_URL),
@@ -129,6 +139,7 @@ export async function loadState() {
       qbit: { ...seed.qbit, ...stored.qbit },
       transmission: { ...seed.transmission, ...stored.transmission },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
+      oidc: { ...seed.oidc, ...stored.oidc },
       notifications: {
         discord: { ...seed.notifications.discord, ...stored.notifications?.discord },
         ntfy: { ...seed.notifications.ntfy, ...stored.notifications?.ntfy },

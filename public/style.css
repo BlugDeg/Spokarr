@@ -442,3 +442,11 @@ details.advanced .muted { font-size: 13px; margin: 0 0 12px; }
 .modal:has(#manPick:not([hidden])) { max-width: 760px; }
 .pick-head { margin: 0 0 4px; font-size: 16px; }
 .pick-list { max-height: 55vh; overflow: auto; margin-bottom: 8px; }
+
+/* Single sign-on */
+.sso-btn { margin-bottom: 4px; }
+.sso-btn svg { width: 18px; height: 18px; }
+.auth-card .or { display: flex; align-items: center; gap: 12px; margin: 16px 0 6px; color: var(--muted); font-size: 13px; }
+.auth-card .or::before, .auth-card .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.copy-row { display: flex; gap: 8px; align-items: center; }
+.copy-row input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }

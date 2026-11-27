@@ -1,6 +1,6 @@
 // Sign-in and first-time setup
 import { t } from '../i18n.js';
-import { api, busy, date, errText, esc, langSwitch, post } from '../lib.js';
+import { api, busy, date, errText, esc, icon, langSwitch, post } from '../lib.js';
 import { session } from '../session.js';
 
 const shell = (inner) => `
@@ -16,15 +16,22 @@ export function renderLogin(root, onDone) {
   const setup = session.status?.setupRequired;
   const needsAbs = setup && !session.status?.absConfigured;
   if (needsAbs) return renderSetupAbs(root, onDone);
+  // Single sign-on (set up by an admin) and an error the provider sent back with the browser
+  const sso = setup ? null : session.status?.sso;
+  const ssoErr = new URLSearchParams(location.search).get('sso_error');
+  if (ssoErr) history.replaceState(null, '', location.pathname + location.hash);
   root.innerHTML = shell(`
     ${setup ? `<h1>${esc(t('setup.title'))}</h1><div class="steps"><span class="step done">1</span><span class="step on">2</span></div>
       <h2>${esc(t('setup.step2'))}</h2><p class="muted">${esc(t('setup.step2Text'))}</p>`
     : `<h1>${esc(t('login.title'))}</h1><p class="muted">${esc(t('login.subtitle'))}</p>`}
-    <form id="loginForm" class="form">
-      <label class="field"><span>${esc(t('login.username'))}</span><input name="username" autocomplete="username" required autofocus></label>
+    ${sso ? `<a class="btn btn-primary btn-block sso-btn" href="/api/auth/oidc/start">${icon.key}${esc(t('login.sso', { label: sso.label }))}</a>
+      ${ssoErr ? `<div class="form-error">${esc(/^[a-z_]+$/.test(ssoErr) && t('err.' + ssoErr) !== 'err.' + ssoErr ? t('err.' + ssoErr) : t('err.oidc_failed'))}</div>` : ''}
+      ${sso.hidePassword ? `<button class="btn btn-link" type="button" id="showPassword">${esc(t('login.withPassword'))}</button>` : `<div class="or"><span>${esc(t('login.or'))}</span></div>`}` : ''}
+    <form id="loginForm" class="form" ${sso?.hidePassword ? 'hidden' : ''}>
+      <label class="field"><span>${esc(t('login.username'))}</span><input name="username" autocomplete="username" required ${sso ? '' : 'autofocus'}></label>
       <label class="field"><span>${esc(t('login.password'))}</span><input name="password" type="password" autocomplete="current-password" required></label>
       <div class="form-error" id="loginError" hidden></div>
-      <button class="btn btn-primary btn-block" type="submit">${esc(t('login.submit'))}</button>
+      <button class="btn ${sso ? 'btn-ghost' : 'btn-primary'} btn-block" type="submit">${esc(t('login.submit'))}</button>
       ${setup ? `<button class="btn btn-link" type="button" id="changeAbs">${esc(t('setup.change'))}</button>` : ''}
     </form>`);
   const form = root.querySelector('#loginForm');
@@ -45,6 +52,7 @@ export function renderLogin(root, onDone) {
     }
   });
   root.querySelector('#changeAbs')?.addEventListener('click', () => renderSetupAbs(root, onDone));
+  root.querySelector('#showPassword')?.addEventListener('click', (e) => { form.hidden = false; e.currentTarget.remove(); form.username.focus(); });
 }
 
 function renderSetupAbs(root, onDone) {
