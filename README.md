@@ -37,7 +37,7 @@
 
 Readarr is built around *books*. Its metadata rarely knows narrators, editions or non-English titles,
 so getting the recording you want is guesswork. Spokarr starts from the Audible catalog instead, finds a
-matching release on your indexers (directly or through Prowlarr), sends it to SABnzbd, NZBGet, qBittorrent or Transmission
+matching release on your indexers (directly or through Prowlarr), sends it to SABnzbd, NZBGet, qBittorrent, Transmission or Deluge
 and hands the finished book to Audiobookshelf – already matched, with cover, chapters and narrator.
 
 ## Features
@@ -75,8 +75,8 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
   Audiobookshelf scans and matches the book, and it is tagged “Requested by &lt;name&gt;”.
 - 📑 **Real chapters**: releases with one file per CD track get proper chapters from the files' title
   tags – or from Audible, when the runtime matches.
-- 🔌 **Prowlarr, SABnzbd, NZBGet, qBittorrent and Transmission**: search all your Prowlarr indexers at once or add Newznab
-  indexers directly; usenet releases go to SABnzbd or NZBGet, torrents to qBittorrent or Transmission. Torrents keep seeding –
+- 🔌 **Prowlarr, SABnzbd, NZBGet, qBittorrent, Transmission and Deluge**: search all your Prowlarr indexers at once or add Newznab
+  indexers directly; usenet releases go to SABnzbd or NZBGet, torrents to qBittorrent, Transmission or Deluge. Torrents keep seeding –
   Spokarr hardlinks (or copies) the files into the library.
 - 🔔 **Notifications** via Discord and ntfy: new requests waiting for approval, approvals, books ready to
   listen to, declined requests and problems – in English or German, with cover and a link to the book.
@@ -117,13 +117,13 @@ and hands the finished book to Audiobookshelf – already matched, with cover, c
 ```
  Audible catalog ──► you pick an edition ──► Prowlarr / Newznab ──► scored releases
                                                                           │
- Audiobookshelf ◄── scan + match + tag ◄── import to Author/Title ◄── SABnzbd / NZBGet / qBittorrent / Transmission
+ Audiobookshelf ◄── scan + match + tag ◄── import to Author/Title ◄── SABnzbd / NZBGet / qBittorrent / Transmission / Deluge
 ```
 
 ## Requirements
 
 - [Audiobookshelf](https://www.audiobookshelf.org/) **2.26 or newer** – used for sign-in and as the library
-- A download client: [SABnzbd](https://sabnzbd.org/) or [NZBGet](https://nzbget.com/) (usenet) and/or [qBittorrent](https://www.qbittorrent.org/) 4.1+ or [Transmission](https://transmissionbt.com/) 3.0+ (torrents)
+- A download client: [SABnzbd](https://sabnzbd.org/) or [NZBGet](https://nzbget.com/) (usenet) and/or [qBittorrent](https://www.qbittorrent.org/) 4.1+ or [Transmission](https://transmissionbt.com/) 3.0+ or [Deluge](https://deluge-torrent.org/) 2.x / 1.3 with the web interface (torrents)
 - Indexers: [Prowlarr](https://prowlarr.com/) and/or Newznab indexers with an audiobook category
 - Docker – or Node.js 20+
 
@@ -203,7 +203,7 @@ Open `http://<host>:5057` and follow the setup:
 1. **Connect Audiobookshelf** – enter its address as the Spokarr server reaches it.
 2. **Sign in as an Audiobookshelf administrator.** You become the owner of Spokarr, and Spokarr creates
    its own API key in Audiobookshelf.
-3. Under **Settings**, add your **download clients** (SABnzbd or NZBGet, qBittorrent or Transmission), **Prowlarr** or Newznab
+3. Under **Settings**, add your **download clients** (SABnzbd or NZBGet, qBittorrent, Transmission or Deluge), **Prowlarr** or Newznab
    **indexers**, and choose the Audiobookshelf **library**.
 
 In your download clients, create the category Spokarr uses (default `spokarr`). Put the download folders

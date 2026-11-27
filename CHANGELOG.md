@@ -3,6 +3,15 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] – 2026-11-27
+
+### Added
+- **Deluge** as torrent client (Deluge 2.x and 1.3, through the web interface): address and web
+  password, optional label (Label plugin) and download folder, path mapping, connection test with
+  version and a note when the Label plugin is off. If the web interface is not connected to a daemon,
+  Spokarr connects it to the first one. Used for torrents when qBittorrent and Transmission are off.
+  Suggested on Reddit – thanks!
+
 ## [0.11.0] – 2026-11-27
 
 ### Added

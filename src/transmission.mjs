@@ -50,7 +50,7 @@ export async function testTransmission(conf) {
  * only Spokarr can reach. So Spokarr resolves the link first: magnet → passed on, .torrent → sent as
  * file content. If that fails, Transmission gets the plain URL as a last resort.
  */
-async function torrentSource(link) {
+export async function torrentSource(link) {
   if (/^magnet:/i.test(link)) return { filename: link };
   let url = link;
   try {

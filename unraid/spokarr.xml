@@ -22,7 +22,7 @@ Setup: open the WebUI, enter your Audiobookshelf address and sign in with an Aud
   <CPUset/>
   <DonateText/>
   <DonateLink/>
-  <Requires>Audiobookshelf 2.26 or newer, SABnzbd or NZBGet and/or qBittorrent or Transmission, Prowlarr or a Newznab indexer.</Requires>
+  <Requires>Audiobookshelf 2.26 or newer, SABnzbd or NZBGet and/or qBittorrent, Transmission or Deluge, Prowlarr or a Newznab indexer.</Requires>
   <Config Name="WebUI Port" Target="5057" Default="5057" Mode="tcp" Description="Port of the web interface" Type="Port" Display="always" Required="true" Mask="false">5057</Config>
   <Config Name="AppData" Target="/data" Default="/mnt/user/appdata/spokarr" Mode="rw" Description="Settings, users and requests" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spokarr</Config>
   <Config Name="Media" Target="/media" Default="/mnt/user/data" Mode="rw" Description="Share with your downloads and your audiobook library (same share for moves and hardlinks)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/data</Config>

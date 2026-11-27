@@ -93,6 +93,14 @@ function settingsFromEnv() {
       downloadDir: env.TRANSMISSION_DOWNLOAD_DIR || '',
       pathFrom: '', pathTo: '',
     },
+    deluge: {
+      enabled: !!env.DELUGE_URL,
+      url: trimUrl(env.DELUGE_URL),
+      password: env.DELUGE_PASSWORD || '',
+      label: env.DELUGE_LABEL ?? 'spokarr',
+      downloadDir: env.DELUGE_DOWNLOAD_DIR || '',
+      pathFrom: '', pathTo: '',
+    },
     // Single sign-on (OpenID Connect), matched to the Audiobookshelf accounts
     oidc: {
       enabled: !!(env.OIDC_ISSUER && env.OIDC_CLIENT_ID),
@@ -138,6 +146,7 @@ export async function loadState() {
       nzbget: { ...seed.nzbget, ...stored.nzbget },
       qbit: { ...seed.qbit, ...stored.qbit },
       transmission: { ...seed.transmission, ...stored.transmission },
+      deluge: { ...seed.deluge, ...stored.deluge },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
       oidc: { ...seed.oidc, ...stored.oidc },
       notifications: {

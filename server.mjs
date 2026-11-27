@@ -15,6 +15,7 @@ import {
 import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
 import { testTransmission } from './src/transmission.mjs';
+import { testDeluge } from './src/deluge.mjs';
 import { createInvite, deleteInvite, inviteInfo, publicInvite, redeemInvite } from './src/invites.mjs';
 import { availableUpdate, checkUpdateNow, latestRelease, startUpdateCheck } from './src/update.mjs';
 import { testNzbget } from './src/nzbget.mjs';
@@ -49,7 +50,7 @@ async function annotate(books) {
 const mask = (s) => {
   const out = structuredClone(s);
   for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
-  for (const sec of [out.qbit, out.nzbget, out.transmission]) { sec.hasPassword = !!sec.password; sec.password = ''; }
+  for (const sec of [out.qbit, out.nzbget, out.transmission, out.deluge]) { sec.hasPassword = !!sec.password; sec.password = ''; }
   out.oidc.hasClientSecret = !!out.oidc.clientSecret; out.oidc.clientSecret = '';
   const n = out.notifications;
   n.discord.hasWebhook = !!n.discord.webhook; n.discord.webhook = '';
@@ -168,6 +169,18 @@ function applySettings(body) {
       label: str(b.label, s.transmission.label),
       downloadDir: str(b.downloadDir, s.transmission.downloadDir),
       pathFrom: str(b.pathFrom, s.transmission.pathFrom), pathTo: str(b.pathTo, s.transmission.pathTo),
+    };
+  }
+  if (body.deluge) {
+    const b = body.deluge;
+    s.deluge = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.deluge.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.deluge.url,
+      password: keepKey(b.password, s.deluge.password),
+      // Deluge's Label plugin only takes lower-case labels
+      label: str(b.label, s.deluge.label).toLowerCase(),
+      downloadDir: str(b.downloadDir, s.deluge.downloadDir),
+      pathFrom: str(b.pathFrom, s.deluge.pathFrom), pathTo: str(b.pathTo, s.deluge.pathTo),
     };
   }
   if (body.prowlarr) {
@@ -448,6 +461,11 @@ route('POST', '/api/settings/test/transmission', ADMIN, async ({ body }) => test
 route('POST', '/api/settings/test/oidc', ADMIN, async ({ req, body }) => ({
   ...(await testOidc({ issuer: trimUrl(body.issuer ?? state.settings.oidc.issuer) })),
   redirectUri: ssoCallbackUrl(req),
+}));
+route('POST', '/api/settings/test/deluge', ADMIN, async ({ body }) => testDeluge({
+  url: trimUrl(body.url ?? state.settings.deluge.url),
+  password: keepKey(body.password, state.settings.deluge.password),
+  label: body.label ?? state.settings.deluge.label,
 }));
 route('POST', '/api/settings/test/prowlarr', ADMIN, async ({ body }) => testProwlarr({
   url: trimUrl(body.url ?? state.settings.prowlarr.url),

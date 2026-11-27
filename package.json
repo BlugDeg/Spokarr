@@ -1,6 +1,6 @@
 {
   "name": "spokarr",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Request and download audiobooks for your Audiobookshelf library – Audible catalog, Newznab indexers, SABnzbd",
   "type": "module",
   "main": "server.mjs",

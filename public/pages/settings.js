@@ -233,6 +233,7 @@ function downloads() {
   const q = data.qbit;
   const n = data.nzbget || {};
   const tr = data.transmission || {};
+  const dl = data.deluge || {};
   return `<form id="f">
     ${svcCard('data-client="sab"', 'sabnzbd', 'SABnzbd', 'Usenet', s.enabled !== false, `
       <div class="grid-2">
@@ -261,6 +262,17 @@ function downloads() {
         ${field(t('settings.transmissionDir'), text('downloadDir', tr.downloadDir, 'placeholder="/downloads/audiobooks"'), t('settings.transmissionDirHint'))}
       </div>
       ${pathFields(tr)}${testFoot()}`)}
+    ${svcCard('data-client="deluge"', 'deluge', 'Deluge', 'Torrent', dl.enabled === true, `
+      <p class="muted client-hint">${esc(t('settings.delugeHint'))}</p>
+      <div class="grid-2">
+        ${field(t('settings.delugeUrl'), text('url', dl.url, 'type="url" placeholder="http://deluge:8112"'), t('settings.delugeUrlHint'))}
+        ${field(t('login.password'), `<input name="password" type="password" autocomplete="new-password" placeholder="${esc(dl.hasPassword ? t('settings.keyStored') : '')}">`, t('settings.delugePasswordHint'))}
+      </div>
+      <div class="grid-2">
+        ${field(t('settings.transmissionLabel'), text('label', dl.label, 'placeholder="spokarr"'), t('settings.delugeLabelHint'))}
+        ${field(t('settings.transmissionDir'), text('downloadDir', dl.downloadDir, 'placeholder="/downloads/audiobooks"'), t('settings.delugeDirHint'))}
+      </div>
+      ${pathFields(dl)}${testFoot()}`)}
     ${saveBar()}
   </form>`;
 }
@@ -276,10 +288,10 @@ function bindDownloads() {
     const client = sec.dataset.client;
     try {
       const r = await post(`/api/settings/test/${client}`, read(sec));
-      const name = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission' }[client];
+      const name = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission', deluge: 'Deluge' }[client];
       const okCat = r.categoryExists;
       out.className = 'test-result ' + (okCat ? 'ok' : 'err');
-      out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}` : t('settings.sabCategoryMissing', { cat: read(sec).category, client: name }));
+      out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}${r.labelWarning ? ' · ' + t('settings.delugeNoLabel') : ''}` : t('settings.sabCategoryMissing', { cat: read(sec).category, client: name }));
     } catch (err) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(errText(err)); }
   })));
   f.addEventListener('submit', (e) => {
