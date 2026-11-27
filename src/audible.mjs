@@ -20,7 +20,7 @@ export const region = () => REGIONS[state.settings.general.region] || REGIONS.us
 export const contentLanguage = () => state.settings.general.contentLanguage || region().lang;
 const base = () => `https://${region().host}/1.0/catalog/products`;
 
-const RG = 'contributors,media,product_attrs,product_desc,product_extended_attrs,series,rating';
+const RG = 'contributors,media,product_attrs,product_desc,product_extended_attrs,series,rating,category_ladders';
 const BOOK_TYPES = new Set(['SinglePartBook', 'MultiPartBook']);
 
 // Audible throttles hard: a handful of parallel requests is enough to make it answer 503 for
@@ -63,6 +63,24 @@ async function audible(params) {
   for (const [k, v] of Object.entries({ response_groups: RG, image_sizes: '500,1024', num_results: 30, ...params })) u.searchParams.set(k, v);
   return audibleFetch(u, { headers: { Accept: 'application/json' } });
 }
+/**
+ * Audible's genre ladders as paths ("Liebesromane > Liebeskomödie"). A ladder that is only the start
+ * of a longer one ("Liebesromane" next to "Liebesromane > Liebeskomödie") adds nothing and is dropped.
+ */
+function categoryPaths(ladders) {
+  const paths = [...new Set((ladders || []).map((l) => (l.ladder || []).map((x) => x.name).filter(Boolean).join(' > ')).filter(Boolean))];
+  return paths.filter((p) => !paths.some((o) => o !== p && o.startsWith(p + ' > ')));
+}
+
+/** Genres hidden on the Discover page (setting). A name hides the genre wherever it sits in a ladder,
+ *  a path ("Literatur > Belletristik") only that branch, both including everything below. */
+const segKey = (p) => ' > ' + String(p).split(/\s*[>\/]\s*/).map(norm).filter(Boolean).join(' > ') + ' > ';
+export function hiddenByGenre(book, hidden = state.settings.general.hiddenGenres) {
+  if (!hidden?.length || !book.categories?.length) return false;
+  const keys = hidden.map(segKey).filter((k) => k.length > 6);
+  return book.categories.some((c) => { const have = segKey(c); return keys.some((k) => have.includes(k)); });
+}
+
 export function mapProduct(p) {
   return {
     asin: p.asin,
@@ -80,6 +98,7 @@ export function mapProduct(p) {
     publisher: p.publisher_name || '',
     summary: stripHtml(p.publisher_summary || p.merchandising_summary || ''),
     genres: (p.thesaurus_subject_keywords || []).slice(0, 5),
+    categories: categoryPaths(p.category_ladders),
     rating: Number(p.rating?.overall_distribution?.display_average_rating) || null,
   };
 }
@@ -342,6 +361,18 @@ async function searchPaged(params, limit, { languageOnly = false } = {}) {
  */
 function rowDefs(sortOverride = '') {
   const g = state.settings.general;
+  // Hidden genres: fetch more, so the row still fills up after the filter. Rows of a chosen genre
+  // stay as they are - whoever adds a genre row wants to see that genre.
+  const hide = (g.hiddenGenres || []).length > 0;
+  const more = (limit) => (hide ? Math.ceil(limit * 1.6) : limit);
+  const keep = (fn) => async (limit) => {
+    const items = await fn(more(limit));
+    return (hide ? items.filter((b) => !hiddenByGenre(b, g.hiddenGenres)) : items).slice(0, limit);
+  };
+  return rawRowDefs(sortOverride).map(([id, title, fn]) => [id, title, id.startsWith('genre') ? fn : keep(fn)]);
+}
+function rawRowDefs(sortOverride = '') {
+  const g = state.settings.general;
   const today = new Date().toISOString().slice(0, 10);
   const cutoff = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
   return [
@@ -363,7 +394,7 @@ function rowDefs(sortOverride = '') {
 export async function discoverRows(sortOverride = '') {
   const g = state.settings.general;
   const limit = g.rowItems || 20;
-  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.discoverRows)}:${JSON.stringify(g.discoverGenres || [])}:${sortOverride}:${g.genreSort || ''}:${limit}`, 30 * 60e3, async () => {
+  return cached(`discover:${g.region}:${contentLanguage()}:${JSON.stringify(g.hiddenGenres || [])}:${JSON.stringify(g.discoverRows)}:${JSON.stringify(g.discoverGenres || [])}:${sortOverride}:${g.genreSort || ''}:${limit}`, 30 * 60e3, async () => {
     const jobs = rowDefs(sortOverride);
     return Promise.all(jobs.map(async ([id, title, fn]) => {
       try { return { id, title, items: (await fn(limit)).slice(0, limit) }; } catch (e) { return { id, title, items: [], error: e.message }; }
@@ -425,7 +456,7 @@ export async function discoverRow(id, { sort = '', limit = 100 } = {}) {
   if (!def) throw new UserError('row_unknown', {}, 404);
   const [rid, title, fn] = def;
   const g = state.settings.general;
-  const items = await cached(`row:${g.region}:${contentLanguage()}:${rid}:${sort}:${limit}`, 10 * 60e3,
+  const items = await cached(`row:${g.region}:${contentLanguage()}:${JSON.stringify(g.hiddenGenres || [])}:${rid}:${sort}:${limit}`, 10 * 60e3,
     () => fn(limit).catch((e) => {
       log(`Row ${rid} could not be loaded:`, e.message);
       throw new UserError('discover_unavailable', {}, 502);

@@ -11,6 +11,11 @@ const isActive = (b) => ['downloading', 'processing'].includes(b.status?.state);
 // Author, narrator and series lead to their own list page
 const listLink = (kind, name) => `#/list?kind=${kind}&name=${encodeURIComponent(name)}`;
 const nameLinks = (kind, names) => (names || []).map((n) => `<a href="${listLink(kind, n)}">${esc(n)}</a>`).join(', ');
+// Genre ladders: every step leads to the genre search of that branch
+const genreLinks = (paths) => (paths || []).slice(0, 4).map((p) => {
+  const parts = p.split(' > ');
+  return parts.map((name, i) => `<a href="#/search?genre=${encodeURIComponent(parts.slice(0, i + 1).join(' > '))}">${esc(name)}</a>`).join(' › ');
+}).join('<br>');
 const seriesLinks = (series) => (series || []).map((s) => `<a href="${listLink('series', s.title)}">${esc(s.title)}</a>`
   + (s.seq ? ' · ' + esc(t('book.seriesBook', { n: s.seq })) : '')).join(', ');
 
@@ -111,6 +116,7 @@ function render(b) {
         ${row(t('book.length'), duration(b.minutes))}
         ${row(t('book.edition'), esc(edition))}
         ${row(t('book.released'), b.manual ? year(b.release) : date(b.release))}
+        ${b.categories?.length ? row(t('book.genre'), genreLinks(b.categories)) : ''}
         ${row(t('book.publisher'), esc(b.publisher))}
         ${b.rating ? row(t('book.rating'), '★ ' + b.rating.toFixed(1)) : ''}
         ${b.manual ? row(t('manual.source'), esc(t(b.requireNarrator ? 'manual.sourceNarrator' : 'manual.sourceText'))) : row('ASIN', esc(b.asin))}

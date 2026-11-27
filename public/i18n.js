@@ -37,7 +37,7 @@ const dict = {
     'book.listen': 'Listen in Audiobookshelf', 'book.releases': 'View releases', 'book.description': 'Description',
     'book.releasesTitle': 'Releases on your indexers', 'book.series': 'Series', 'book.seriesBook': 'Book {n}',
     'book.author': 'Author', 'book.narrator': 'Narrator', 'book.length': 'Length', 'book.edition': 'Edition',
-    'book.released': 'Released', 'book.publisher': 'Publisher', 'book.rating': 'Rating', 'book.left': '{t} left',
+    'book.released': 'Released', 'book.publisher': 'Publisher', 'book.genre': 'Genre', 'book.rating': 'Rating', 'book.left': '{t} left',
     'book.requestedBy': 'Requested by {name}', 'book.approve': 'Approve', 'book.decline': 'Decline',
 
     'rel.searching': 'Searching your indexers…', 'rel.none': 'No results on your indexers.', 'rel.download': 'Download',
@@ -72,6 +72,7 @@ const dict = {
     'settings.language': 'Book language', 'settings.languageHint': 'Discover rows only show books in this language. Empty = language of the store ({lang}).',
     'settings.rows': 'Discover rows', 'settings.rowsHint': 'Extra rows on the discover page. Keywords are searched on Audible; with a narrator only books read by that person are shown.',
     'settings.genres': 'Genres', 'settings.genresHint': 'Comma separated, e.g. Science Fiction, Krimi. Each genre becomes its own row on the discover page and can be picked in the search.',
+    'settings.hiddenGenres': 'Hide genres', 'settings.hiddenGenresHint': 'Comma separated, e.g. Romance. Books of these genres no longer appear in Popular, New releases and your own rows. The search still finds them, and genre rows above stay as they are.',
     'settings.genreSort': 'Default sort for genre rows', 'settings.genreSortHint': 'Can be changed on the discover page at any time.',
     'settings.rowItems': 'Books per row', 'settings.rowItemsHint': 'How many covers a row shows (10 to 50).',
     'settings.rowTitle': 'Title', 'settings.rowKeywords': 'Keywords', 'settings.rowNarrator': 'Narrator (optional)',
@@ -236,7 +237,7 @@ const dict = {
     'book.listen': 'In Audiobookshelf anhören', 'book.releases': 'Releases ansehen', 'book.description': 'Beschreibung',
     'book.releasesTitle': 'Releases bei den Indexern', 'book.series': 'Serie', 'book.seriesBook': 'Band {n}',
     'book.author': 'Autor', 'book.narrator': 'Sprecher', 'book.length': 'Länge', 'book.edition': 'Fassung',
-    'book.released': 'Erschienen', 'book.publisher': 'Verlag', 'book.rating': 'Bewertung', 'book.left': 'noch {t}',
+    'book.released': 'Erschienen', 'book.publisher': 'Verlag', 'book.genre': 'Genre', 'book.rating': 'Bewertung', 'book.left': 'noch {t}',
     'book.requestedBy': 'Angefragt von {name}', 'book.approve': 'Freigeben', 'book.decline': 'Ablehnen',
 
     'rel.searching': 'Suche bei den Indexern …', 'rel.none': 'Keine Treffer bei den Indexern.', 'rel.download': 'Laden',
@@ -271,6 +272,7 @@ const dict = {
     'settings.language': 'Sprache der Bücher', 'settings.languageHint': 'Die Reihen auf «Entdecken» zeigen nur Bücher in dieser Sprache. Leer = Sprache des Shops ({lang}).',
     'settings.rows': 'Reihen auf «Entdecken»', 'settings.rowsHint': 'Zusätzliche Reihen auf der Startseite. Die Stichwörter werden bei Audible gesucht; mit Sprecher erscheinen nur Bücher, die diese Person liest.',
     'settings.genres': 'Genres', 'settings.genresHint': 'Komma getrennt, z. B. Science Fiction, Krimi. Jedes Genre bekommt eine eigene Zeile auf der Entdecken-Seite und ist in der Suche wählbar.',
+    'settings.hiddenGenres': 'Genres ausblenden', 'settings.hiddenGenresHint': 'Komma getrennt, z. B. Liebesromane. Bücher dieser Genres erscheinen nicht mehr unter Beliebt, Neu erschienen und in deinen eigenen Zeilen. Die Suche findet sie weiterhin, und die Genre-Zeilen oben bleiben, wie sie sind.',
     'settings.genreSort': 'Standardsortierung der Genre-Zeilen', 'settings.genreSortHint': 'Lässt sich auf der Entdecken-Seite jederzeit umstellen.',
     'settings.rowItems': 'Bücher pro Zeile', 'settings.rowItemsHint': 'Wie viele Cover eine Zeile zeigt (10 bis 50).',
     'settings.rowTitle': 'Titel', 'settings.rowKeywords': 'Stichwörter', 'settings.rowNarrator': 'Sprecher (optional)',

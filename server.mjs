@@ -78,6 +78,10 @@ function applySettings(body) {
       const list = Array.isArray(g.discoverGenres) ? g.discoverGenres : String(g.discoverGenres || '').split(/[;,]/);
       s.general.discoverGenres = list.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 12);
     }
+    if (g.hiddenGenres !== undefined) {
+      const list = Array.isArray(g.hiddenGenres) ? g.hiddenGenres : String(g.hiddenGenres || '').split(/[;,]/);
+      s.general.hiddenGenres = list.map((x) => String(x || '').trim().slice(0, 200)).filter(Boolean).slice(0, 30);
+    }
     if (g.genreSort !== undefined) s.general.genreSort = SORTS[g.genreSort] ? g.genreSort : 'popular';
     if (g.rowItems !== undefined) s.general.rowItems = Math.min(50, Math.max(10, Number(g.rowItems) || 20));
     if (g.defaultPermissions) {

@@ -25,7 +25,7 @@ export async function pageSettings(tab = 'general') {
   // Delegated on the container (focusin bubbles, focus does not), so it survives a re-render and
   // does not sit on a node that may already have been replaced.
   v.addEventListener('focusin', (e) => {
-    if (e.target?.name === 'discoverGenres' && !genres) fillGenres();
+    if ((e.target?.name === 'discoverGenres' || e.target?.name === 'hiddenGenres') && !genres) fillGenres();
   });
 }
 
@@ -89,6 +89,7 @@ function general() {
       <button type="button" class="btn btn-ghost btn-sm" id="addRow">${icon.plus}${esc(t('settings.addRow'))}</button>`, t('settings.rowsHint'))}
     ${section(t('settings.genres'), `
       ${field(t('settings.genres'), text('discoverGenres', (g.discoverGenres || []).join(', '), 'placeholder="Science Fiction, Krimi" list="genreList"') + `<datalist id="genreList">${(genreNames || []).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>`, t('settings.genresHint'))}
+      ${field(t('settings.hiddenGenres'), text('hiddenGenres', (g.hiddenGenres || []).join(', '), 'placeholder="Romance, Erotik" list="genreList"'), t('settings.hiddenGenresHint'))}
       <div class="grid-2">${field(t('settings.genreSort'), `<select name="genreSort">${['popular','hot','new','rating','old','long'].map((k) => `<option value="${k}" ${k === (g.genreSort || 'popular') ? 'selected' : ''}>${esc(t('sort.' + k))}</option>`).join('')}</select>`, t('settings.genreSortHint'))}
       ${field(t('settings.rowItems'), text('rowItems', g.rowItems ?? 20, 'type="number" min="10" max="50"'), t('settings.rowItemsHint'))}</div>`)}
     ${section(t('settings.defaults'), `
@@ -123,6 +124,7 @@ function bindGeneral() {
           appUrl: f.appUrl.value, stallHours: Number(f.stallHours.value), updateCheck: f.updateCheck.checked, requireAuthor: f.requireAuthor.checked,
           discoverRows: [...rows.querySelectorAll('.row-edit')].map((r) => Object.fromEntries([...r.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value]))),
           discoverGenres: String(f.discoverGenres.value || '').split(',').map((x) => x.trim()).filter(Boolean),
+          hiddenGenres: String(f.hiddenGenres.value || '').split(',').map((x) => x.trim()).filter(Boolean),
           genreSort: f.genreSort.value, rowItems: Math.min(50, Math.max(10, Number(f.rowItems.value) || 20)),
           defaultPermissions: { request: f.request.checked, autoApprove: f.autoApprove.checked, manageRequests: f.manageRequests.checked },
         } });

@@ -40,6 +40,7 @@ function settingsFromEnv() {
       // Genres for custom discover rows and the genre search (env only seeds this)
       discoverGenres: String(env.DISCOVER_GENRES || '').split(/[;,]/).map((x) => x.trim()).filter(Boolean),
       genreSort: env.GENRE_SORT || 'popular',
+      hiddenGenres: String(env.HIDDEN_GENRES || '').split(/[;,]/).map((x) => x.trim()).filter(Boolean),
       rowItems: 20,
       defaultPermissions: { ...DEFAULT_PERMISSIONS },
       tagRequester: true,
