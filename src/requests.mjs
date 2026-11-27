@@ -6,6 +6,7 @@ import { absAddTags, absEnabled, absImproveChapters, absItems, absMatch, absScan
 import { contentLanguage, getBook, region } from './audible.mjs';
 import { findReleases } from './indexers.mjs';
 import { CLIENT_NAMES, clientStatus, removeClientDownload, startClientDownload } from './downloads.mjs';
+import { chaptarrEnabled, chaptarrSearchAgain, sendToChaptarr } from './chaptarr.mjs';
 import { notify } from './notify.mjs';
 import { LIBRARY_DIR, save, state } from './store.mjs';
 import { cleanTitle, firstAuthor, log, norm, randomId, safeName, uncache, UserError } from './util.mjs';
@@ -56,8 +57,36 @@ export async function statusResolver() {
   };
 }
 
+/**
+ * Chaptarr mode: the book is handed to Chaptarr, which searches, downloads and imports it. A release
+ * picked by hand still goes through Spokarr's own download clients.
+ */
+async function handToChaptarr(req) {
+  const now = new Date().toISOString();
+  if (req.status === 'downloading' && req.download?.client === 'chaptarr') {
+    await chaptarrSearchAgain(req.download.ref);
+    Object.assign(req, { message: msg('chaptarr_waiting'), stalled: false, progressAt: Date.now(), updatedAt: now });
+    return;
+  }
+  let sent;
+  try {
+    sent = await sendToChaptarr(req.book);
+  } catch (e) {
+    if (e.code !== 'chaptarr_no_match') throw e;
+    Object.assign(req, { status: 'not_found', progress: 0, release: null, download: null, eta: '', stalled: false, message: msg('chaptarr_no_match'), updatedAt: now });
+    return;
+  }
+  Object.assign(req, {
+    status: 'downloading', progress: 0, eta: '', stalled: false, misses: 0, lastProgress: 0, progressAt: Date.now(), updatedAt: now,
+    download: { client: 'chaptarr', ref: sent.ref }, message: msg('chaptarr_waiting'), chosenGuid: null,
+    release: { title: `Chaptarr: ${sent.title}`, size: 0, guid: null, indexer: 'Chaptarr', protocol: 'chaptarr' },
+  });
+  log('Handed to Chaptarr', req.book.title, '→', sent.title);
+}
+
 async function startDownload(req, guid) {
   guid = guid || req.chosenGuid || null;
+  if (chaptarrEnabled() && !guid) return handToChaptarr(req);
   const releases = await findReleases(req.book);
   const rel = guid ? releases.find((r) => r.guid === guid) : releases.find((r) => r.ok);
   const running = req.status === 'downloading' && req.download;
@@ -286,7 +315,11 @@ async function linkInAbs(req) {
   for (let i = 0; i < 24; i++) {
     await new Promise((r) => setTimeout(r, 5000));
     uncache('abs:items');
-    const item = (await absItems()).find((x) => x.path === absPath);
+    const items = await absItems();
+    // Chaptarr's folder names can differ in detail from what Spokarr expects: fall back to the last two
+    // parts of the path (Author/Title)
+    const tail = req.path.split('/').filter(Boolean).slice(-2).join('/');
+    const item = items.find((x) => x.path === absPath) || (tail.includes('/') ? items.find((x) => String(x.path || '').endsWith('/' + tail)) : null);
     if (item) {
       req.absId = item.id;
       // A manual book is exactly the edition that is no longer on Audible: matching it would overwrite
@@ -337,6 +370,7 @@ export async function poll() {
           log('Download stalled', req.book.title);
         }
         req.message = req.stalled ? msg('stalled', { hours })
+          : st.waiting ? msg('chaptarr_waiting')
           : st.paused ? msg('paused') : st.message ? msg('client_status', { client: CLIENT_NAMES[req.download?.client] || 'SABnzbd', status: st.message }) : null;
         continue;
       }
@@ -359,7 +393,9 @@ export async function poll() {
         req.progress = 100;
         await save.requests();
         try {
-          await importDownload(req, st.path, !!st.keep);
+          // Chaptarr imports on its own – the book is already in the library
+          if (st.imported) req.path = st.path;
+          else await importDownload(req, st.path, !!st.keep);
           const ok = await linkInAbs(req);
           req.status = 'available';
           req.message = ok ? null : msg('not_scanned_yet');

@@ -101,6 +101,16 @@ function settingsFromEnv() {
       downloadDir: env.DELUGE_DOWNLOAD_DIR || '',
       pathFrom: '', pathTo: '',
     },
+    // Chaptarr as backend: requests are handed over instead of searched and downloaded by Spokarr
+    chaptarr: {
+      enabled: !!(env.CHAPTARR_URL && env.CHAPTARR_API_KEY),
+      url: trimUrl(env.CHAPTARR_URL),
+      apiKey: env.CHAPTARR_API_KEY || '',
+      rootFolder: env.CHAPTARR_ROOT_FOLDER || '',
+      qualityProfileId: Number(env.CHAPTARR_QUALITY_PROFILE_ID) || null,
+      metadataProfileId: Number(env.CHAPTARR_METADATA_PROFILE_ID) || null,
+      pathFrom: '', pathTo: '',
+    },
     // Single sign-on (OpenID Connect), matched to the Audiobookshelf accounts
     oidc: {
       enabled: !!(env.OIDC_ISSUER && env.OIDC_CLIENT_ID),
@@ -147,6 +157,7 @@ export async function loadState() {
       qbit: { ...seed.qbit, ...stored.qbit },
       transmission: { ...seed.transmission, ...stored.transmission },
       deluge: { ...seed.deluge, ...stored.deluge },
+      chaptarr: { ...seed.chaptarr, ...stored.chaptarr },
       prowlarr: { ...seed.prowlarr, ...stored.prowlarr },
       oidc: { ...seed.oidc, ...stored.oidc },
       notifications: {

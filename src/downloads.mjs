@@ -6,8 +6,9 @@ import { state } from './store.mjs';
 import { sendToTransmission, transmissionEnabled, transmissionRemove, transmissionStatus } from './transmission.mjs';
 import { UserError } from './util.mjs';
 import { delugeEnabled, delugeRemove, delugeStatus, sendToDeluge } from './deluge.mjs';
+import { chaptarrStatus } from './chaptarr.mjs';
 
-export const CLIENT_NAMES = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission', deluge: 'Deluge' };
+export const CLIENT_NAMES = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission', deluge: 'Deluge', chaptarr: 'Chaptarr' };
 
 /** usenet → SABnzbd (or NZBGet), torrent → qBittorrent (or Transmission, or Deluge) */
 export function clientFor(protocol) {
@@ -31,6 +32,7 @@ export async function clientStatus(download) {
   const st = download.client === 'qbit' ? await qbitStatus(download.ref)
     : download.client === 'transmission' ? await transmissionStatus(download.ref)
     : download.client === 'deluge' ? await delugeStatus(download.ref)
+    : download.client === 'chaptarr' ? await chaptarrStatus(download.ref)
     : download.client === 'nzbget' ? await nzbgetStatus(download.ref)
     : await sabStatus(download.ref);
   if (st.path) st.path = mapPath(download.client, st.path);
@@ -47,7 +49,8 @@ export function mapPath(client, p) {
 }
 
 export async function removeClientDownload(download) {
-  if (!download) return;
+  // Chaptarr keeps its book: "search again" asks it to search, nothing is removed
+  if (!download || download.client === 'chaptarr') return;
   if (download.client === 'qbit') await qbitRemove(download.ref);
   else if (download.client === 'transmission') await transmissionRemove(download.ref);
   else if (download.client === 'deluge') await delugeRemove(download.ref);

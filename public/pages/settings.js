@@ -44,7 +44,7 @@ const field = (label, input, hint = '') => `<label class="field"><span>${esc(lab
 const text = (name, value, attrs = '') => `<input name="${name}" value="${esc(value ?? '')}" ${attrs}>`;
 const keyInput = (name, has) => `<input name="${name}" type="password" autocomplete="off" placeholder="${esc(has ? t('settings.keyStored') : '')}">`;
 const toggle = (name, checked, label, hint = '') => `<label class="toggle"><input type="checkbox" name="${name}" ${checked ? 'checked' : ''}><span class="switch"></span><span><b>${esc(label)}</b>${hint ? `<small>${esc(hint)}</small>` : ''}</span></label>`;
-const logo = (name) => `<img class="svc-logo" src="/icons/${name}.svg" alt="" width="26" height="26">`;
+const logo = (name) => `<img class="svc-logo" src="/icons/${name.includes('.') ? name : name + '.svg'}" alt="" width="26" height="26">`;
 // A service card: logo, name, on/off switch; switched off it collapses to that one line
 const svcCard = (attrs, logoName, title, pill, enabled, body) => `
   <section class="panel settings-section client${enabled ? '' : ' off'}" ${attrs}>
@@ -228,6 +228,27 @@ const pathFields = (c) => `
       ${field(t('settings.pathTo'), text('pathTo', c.pathTo, 'placeholder="/media/downloads"'))}
     </div>
   </details>`;
+// Chaptarr: picked folder and profiles; the lists come from the connection test
+let chaptarrInfo = null;
+const chOptions = (list, current, label) => {
+  const items = list || (current ? [{ value: current, label: String(current) }] : []);
+  return `<option value="">–</option>${items.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(current ?? '') ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}`;
+};
+function chaptarrCard(c) {
+  const i = chaptarrInfo;
+  return svcCard('data-client="chaptarr"', 'chaptarr.png', 'Chaptarr', t('settings.chaptarrPill'), c.enabled === true, `
+      <p class="muted client-hint">${esc(t('settings.chaptarrHint'))}</p>
+      <div class="grid-2">
+        ${field(t('settings.chaptarrUrl'), text('url', c.url, 'type="url" placeholder="http://chaptarr:8789"'))}
+        ${field(t('settings.apiKey'), keyInput('apiKey', c.hasApiKey), t('settings.chaptarrKeyHint'))}
+      </div>
+      ${field(t('settings.chaptarrRoot'), `<select name="rootFolder">${chOptions(i?.rootFolders.map((f) => ({ value: f.path, label: f.name && f.name !== f.path ? `${f.name} – ${f.path}` : f.path })), c.rootFolder)}</select>`, t('settings.chaptarrRootHint'))}
+      <div class="grid-2">
+        ${field(t('settings.chaptarrQuality'), `<select name="qualityProfileId">${chOptions(i?.qualityProfiles.map((p) => ({ value: p.id, label: p.name })), c.qualityProfileId)}</select>`)}
+        ${field(t('settings.chaptarrMetadata'), `<select name="metadataProfileId">${chOptions(i?.metadataProfiles.map((p) => ({ value: p.id, label: p.name })), c.metadataProfileId)}</select>`)}
+      </div>
+      ${pathFields(c)}${testFoot()}`);
+}
 function downloads() {
   const s = data.sab;
   const q = data.qbit;
@@ -235,6 +256,7 @@ function downloads() {
   const tr = data.transmission || {};
   const dl = data.deluge || {};
   return `<form id="f">
+    ${chaptarrCard(data.chaptarr || {})}
     ${svcCard('data-client="sab"', 'sabnzbd', 'SABnzbd', 'Usenet', s.enabled !== false, `
       <div class="grid-2">
         ${field(t('settings.sabUrl'), text('url', s.url, 'type="url" placeholder="http://sabnzbd:8080"'))}
@@ -281,14 +303,37 @@ function bindDownloads() {
   bindCollapse(f);
   const read = (sec) => ({
     enabled: sec.querySelector('[name=enabled]').checked,
-    ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.name, i.value])),
+    ...Object.fromEntries([...sec.querySelectorAll('input:not([type=checkbox]), select')].map((i) => [i.name, i.value])),
   });
+  // Chaptarr is set up but its lists are not loaded yet: fetch them quietly, so the pickers show names
+  const ch = f.querySelector('[data-client=chaptarr]');
+  if (ch && !chaptarrInfo && data.chaptarr?.enabled && data.chaptarr?.url) {
+    post('/api/settings/test/chaptarr', {}).then((r) => {
+      chaptarrInfo = r;
+      const fill = (name, list, value) => { const el = ch.querySelector(`[name=${name}]`); if (el) el.innerHTML = chOptions(list, value); };
+      fill('rootFolder', r.rootFolders.map((x) => ({ value: x.path, label: x.name && x.name !== x.path ? `${x.name} – ${x.path}` : x.path })), data.chaptarr.rootFolder);
+      fill('qualityProfileId', r.qualityProfiles.map((x) => ({ value: x.id, label: x.name })), data.chaptarr.qualityProfileId);
+      fill('metadataProfileId', r.metadataProfiles.map((x) => ({ value: x.id, label: x.name })), data.chaptarr.metadataProfileId);
+    }).catch(() => {});
+  }
   f.querySelectorAll('[data-client]').forEach((sec) => sec.querySelector('[data-test]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     const out = sec.querySelector('[data-result]');
     const client = sec.dataset.client;
     try {
       const r = await post(`/api/settings/test/${client}`, read(sec));
-      const name = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission', deluge: 'Deluge' }[client];
+      if (client === 'chaptarr') {
+        // fill the pickers; a folder brings its own default profiles
+        chaptarrInfo = r;
+        const cur = read(sec);
+        const fill = (name, list, value) => { sec.querySelector(`[name=${name}]`).innerHTML = chOptions(list, value); };
+        const root = cur.rootFolder || r.rootFolders[0]?.path || '';
+        const rf = r.rootFolders.find((f) => f.path === root);
+        fill('rootFolder', r.rootFolders.map((f) => ({ value: f.path, label: f.name && f.name !== f.path ? `${f.name} – ${f.path}` : f.path })), root);
+        fill('qualityProfileId', r.qualityProfiles.map((p) => ({ value: p.id, label: p.name })), cur.qualityProfileId || rf?.qualityProfileId || r.qualityProfiles[0]?.id);
+        fill('metadataProfileId', r.metadataProfiles.map((p) => ({ value: p.id, label: p.name })), cur.metadataProfileId || rf?.metadataProfileId || r.metadataProfiles[0]?.id);
+        if (!r.rootFolders.length) { out.className = 'test-result err'; out.innerHTML = icon.warn + esc(t('settings.chaptarrNoRoot')); return; }
+      }
+      const name = { sab: 'SABnzbd', nzbget: 'NZBGet', qbit: 'qBittorrent', transmission: 'Transmission', deluge: 'Deluge', chaptarr: 'Chaptarr' }[client];
       const okCat = r.categoryExists;
       out.className = 'test-result ' + (okCat ? 'ok' : 'err');
       out.innerHTML = (okCat ? icon.check : icon.warn) + esc(okCat ? `${t('settings.testOk')} · ${name} ${r.version}${r.labelWarning ? ' · ' + t('settings.delugeNoLabel') : ''}` : t('settings.sabCategoryMissing', { cat: read(sec).category, client: name }));

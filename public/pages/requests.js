@@ -93,7 +93,7 @@ function item(r, manager) {
           ${r.requestedBy ? `<span class="who">${avatar(r.requestedBy.username, 'xs')}${esc(r.requestedBy.username)}</span>` : ''}
           <span>${esc(t('req.requested', { t: since(r.createdAt) }))}</span>
           ${r.message ? `<span>${esc(msgText(r.message))}</span>` : ''}
-          ${r.release && manager ? `<span class="rel-name">${esc(r.release.title)} · ${size(r.release.size)}</span>` : ''}
+          ${r.release && manager ? `<span class="rel-name">${esc(r.release.title)}${r.release.size ? ` · ${size(r.release.size)}` : ''}</span>` : ''}
         </div>
       </div>
       <div class="side">

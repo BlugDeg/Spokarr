@@ -40,6 +40,9 @@ so getting the recording you want is guesswork. Spokarr starts from the Audible 
 matching release on your indexers (directly or through Prowlarr), sends it to SABnzbd, NZBGet, qBittorrent, Transmission or Deluge
 and hands the finished book to Audiobookshelf – already matched, with cover, chapters and narrator.
 
+Already running [Chaptarr](https://github.com/Chaptarr/chaptarr) as your library manager? Spokarr can be
+the request page in front of it instead – see [Chaptarr as backend](#chaptarr-as-backend).
+
 ## Features
 
 **For listeners**
@@ -241,6 +244,26 @@ spokarr.example.com {
 
 Nginx Proxy Manager: *Add Proxy Host* → domain `spokarr.example.com`, scheme `http`, forward host and
 port `5057`; on the *SSL* tab request a Let's Encrypt certificate and enable *Force SSL*.
+
+### Chaptarr as backend
+
+If you manage your library with [Chaptarr](https://github.com/Chaptarr/chaptarr), Spokarr can hand
+approved requests to it – like Seerr does with Sonarr and Radarr. Your household requests in Spokarr and
+never sees Chaptarr; Chaptarr searches, downloads and imports.
+
+1. **Settings → Download clients → Chaptarr**: address and API key (Chaptarr → Settings → General), then
+   *Test*. Pick the audiobook root folder (ideally the folder of your Audiobookshelf library), the quality
+   and the metadata profile, and save.
+2. An approved request is looked up in Chaptarr by title and author (Chaptarr has its own book ids, not
+   ASINs; companion books, summaries and box sets are skipped), added as a monitored audiobook and
+   searched. Only that book is monitored – not the rest of the author's work.
+3. Spokarr shows Chaptarr's queue progress. Once the book has a file in Chaptarr, Spokarr scans
+   Audiobookshelf, matches the item to the requested ASIN and adds the "Requested by" tag. If Chaptarr
+   sees the library under another path than Spokarr, set the path mapping in the Chaptarr card.
+
+Which edition, language and format Chaptarr grabs is decided by its own profiles. A release picked by
+hand under *View releases* still goes through Spokarr's own download clients. Chaptarr is in beta and
+its API is not documented yet; Spokarr was tested against Chaptarr 0.9.1000.
 
 ### Single sign-on (OIDC)
 

@@ -3,6 +3,20 @@
 All notable changes to Spokarr. The format follows [Keep a Changelog](https://keepachangelog.com/),
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] – 2026-11-27
+
+### Added
+- **Chaptarr as backend** (Settings → Download clients → Chaptarr): approved requests are handed to
+  Chaptarr instead of being searched and downloaded by Spokarr – like Seerr with Sonarr/Radarr. The book
+  is looked up by title and author (series suffixes ignored, box sets, workbooks and summaries skipped),
+  added as a monitored audiobook (only that book) and searched. Spokarr shows Chaptarr's queue progress
+  and, once the file is there, scans Audiobookshelf, matches the ASIN and tags the requester. "Search
+  again" asks Chaptarr to search once more. Root folder and profiles are picked from lists after the
+  connection test. Requested on Reddit – thanks!
+
+### Changed
+- The requests list no longer shows a size of 0 for releases without one.
+
 ## [0.12.0] – 2026-11-27
 
 ### Added

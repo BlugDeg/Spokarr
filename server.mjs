@@ -16,6 +16,7 @@ import { EVENTS, testNotify } from './src/notify.mjs';
 import { testQbit } from './src/qbit.mjs';
 import { testTransmission } from './src/transmission.mjs';
 import { testDeluge } from './src/deluge.mjs';
+import { testChaptarr } from './src/chaptarr.mjs';
 import { createInvite, deleteInvite, inviteInfo, publicInvite, redeemInvite } from './src/invites.mjs';
 import { availableUpdate, checkUpdateNow, latestRelease, startUpdateCheck } from './src/update.mjs';
 import { testNzbget } from './src/nzbget.mjs';
@@ -49,7 +50,7 @@ async function annotate(books) {
 }
 const mask = (s) => {
   const out = structuredClone(s);
-  for (const sec of [out.abs, out.sab, out.prowlarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
+  for (const sec of [out.abs, out.sab, out.prowlarr, out.chaptarr]) { sec.hasApiKey = !!sec.apiKey; sec.apiKey = ''; }
   for (const sec of [out.qbit, out.nzbget, out.transmission, out.deluge]) { sec.hasPassword = !!sec.password; sec.password = ''; }
   out.oidc.hasClientSecret = !!out.oidc.clientSecret; out.oidc.clientSecret = '';
   const n = out.notifications;
@@ -169,6 +170,19 @@ function applySettings(body) {
       label: str(b.label, s.transmission.label),
       downloadDir: str(b.downloadDir, s.transmission.downloadDir),
       pathFrom: str(b.pathFrom, s.transmission.pathFrom), pathTo: str(b.pathTo, s.transmission.pathTo),
+    };
+  }
+  if (body.chaptarr) {
+    const b = body.chaptarr;
+    const id = (v, old) => (v === undefined ? old : Number(v) || null);
+    s.chaptarr = {
+      enabled: b.enabled !== undefined ? bool(b.enabled) : s.chaptarr.enabled,
+      url: b.url !== undefined ? trimUrl(b.url) : s.chaptarr.url,
+      apiKey: keepKey(b.apiKey, s.chaptarr.apiKey),
+      rootFolder: str(b.rootFolder, s.chaptarr.rootFolder),
+      qualityProfileId: id(b.qualityProfileId, s.chaptarr.qualityProfileId),
+      metadataProfileId: id(b.metadataProfileId, s.chaptarr.metadataProfileId),
+      pathFrom: str(b.pathFrom, s.chaptarr.pathFrom), pathTo: str(b.pathTo, s.chaptarr.pathTo),
     };
   }
   if (body.deluge) {
@@ -461,6 +475,10 @@ route('POST', '/api/settings/test/transmission', ADMIN, async ({ body }) => test
 route('POST', '/api/settings/test/oidc', ADMIN, async ({ req, body }) => ({
   ...(await testOidc({ issuer: trimUrl(body.issuer ?? state.settings.oidc.issuer) })),
   redirectUri: ssoCallbackUrl(req),
+}));
+route('POST', '/api/settings/test/chaptarr', ADMIN, async ({ body }) => testChaptarr({
+  url: trimUrl(body.url ?? state.settings.chaptarr.url),
+  apiKey: keepKey(body.apiKey, state.settings.chaptarr.apiKey),
 }));
 route('POST', '/api/settings/test/deluge', ADMIN, async ({ body }) => testDeluge({
   url: trimUrl(body.url ?? state.settings.deluge.url),
